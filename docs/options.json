@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-13T07:00:51.611Z",
+  "updatedAt": "2026-08-13T23:36:38.251Z",
   "checkoutQuestions": [
     "Account contact email (Parent/Carer)",
     "Account contact mobile (Parent/Carer)",
@@ -47,6 +47,14 @@
   "ticketTypes": [
     "Camper",
     "Team Member"
+  ],
+  "ticketStatuses": [
+    "cancelled",
+    "complete",
+    "free",
+    "paid",
+    "partiallyRefunded",
+    "refunded"
   ],
   "mergeFields": [
     {
