@@ -2,10 +2,11 @@ name: Sync Humanitix attendees to Mailchimp
 
 on:
   schedule:
-    # Every 10 minutes. GitHub's scheduler can lag a few minutes under load -
-    # tighten this (min 5 min) or move to a dedicated cron host (e.g. a
-    # Cloudflare Worker Cron Trigger) if you need tighter reliability.
-    - cron: "*/10 * * * *"
+    # Every 3 hours. Registrations don't come in fast enough to need tighter
+    # polling, and this keeps GitHub Actions minutes usage minimal (~240
+    # runs/month vs 4,320 at a 10-minute interval). Use "Sync now" in the
+    # control panel for anything time-sensitive, like right before a send.
+    - cron: "0 */3 * * *"
   workflow_dispatch:
     inputs:
       full:

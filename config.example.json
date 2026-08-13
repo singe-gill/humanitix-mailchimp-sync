@@ -1,6 +1,8 @@
 {
   "_comment": "Copy this file to config.json and edit. Run `npm run discover` first to see your real checkout question labels, then match them exactly in 'match' below.",
 
+  "excludeStatuses": ["cancelled", "canceled", "refunded", "void", "voided"],
+
   "emailRouting": [
     {
       "_comment": "Team members: sync one contact, using their own email/name questions, tagged 'Staff'.",

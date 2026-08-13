@@ -14,6 +14,7 @@ import {
   buildQuestionLabelMap,
   groupTicketsByOrderId,
   extractAttendees,
+  DEFAULT_EXCLUDED_STATUSES,
 } from "./humanitix.js";
 import { listMergeFields, listTags } from "./mailchimp.js";
 
@@ -48,7 +49,9 @@ async function main() {
   const eventIds = HUMANITIX_EVENT_IDS.split(",").map((s) => s.trim()).filter(Boolean);
   const questionSet = new Set();
   const ticketTypeSet = new Set();
+  const statusSet = new Set();
   const config = loadConfig();
+  let totalSkipped = 0;
 
   for (const eventId of eventIds) {
     console.log(`Scanning event ${eventId}...`);
@@ -64,6 +67,12 @@ async function main() {
     for (const ticket of tickets) {
       const typeName = ticket.ticketTypeName || ticket.ticketType;
       if (typeName) ticketTypeSet.add(typeName);
+      if (ticket.status) statusSet.add(ticket.status);
+      if (ticket.financialStatus) statusSet.add(ticket.financialStatus);
+    }
+    for (const order of orders) {
+      if (order.status) statusSet.add(order.status);
+      if (order.financialStatus) statusSet.add(order.financialStatus);
     }
 
     // Recent orders are enough to discover the question set - no need to
@@ -72,8 +81,15 @@ async function main() {
     let attendeesSeen = 0;
     for (const order of sample) {
       const ticketsForOrder = ticketsByOrderId.get(order._id || order.id) || [];
-      const attendees = extractAttendees(order, ticketsForOrder, questionLabelMap, config.emailRouting || []);
+      const { attendees, skipped } = extractAttendees(
+        order,
+        ticketsForOrder,
+        questionLabelMap,
+        config.emailRouting || [],
+        config.excludeStatuses || DEFAULT_EXCLUDED_STATUSES
+      );
       attendeesSeen += attendees.length;
+      totalSkipped += skipped;
       for (const attendee of attendees) {
         for (const qa of attendee.answers) {
           questionSet.add(qa.question);
@@ -82,6 +98,10 @@ async function main() {
     }
     console.log(`  ${attendeesSeen} attendee(s) scanned (after email routing), ${questionSet.size} unique question(s) found so far.`);
   }
+
+  console.log(`\nSkipped ${totalSkipped} cancelled/refunded ticket(s) total (using excludeStatuses: ${JSON.stringify(config.excludeStatuses || DEFAULT_EXCLUDED_STATUSES)}).`);
+  console.log(`Distinct status values seen across your account: ${JSON.stringify(Array.from(statusSet).sort())}`);
+  console.log("If a cancelled/refunded ticket used a status not in excludeStatuses above, add it via config.json's \"excludeStatuses\".");
 
   console.log("Fetching Mailchimp merge fields...");
   const mergeFields = await listMergeFields({
@@ -101,6 +121,7 @@ async function main() {
     updatedAt: new Date().toISOString(),
     checkoutQuestions: Array.from(questionSet).sort(),
     ticketTypes: Array.from(ticketTypeSet).sort(),
+    ticketStatuses: Array.from(statusSet).sort(),
     mergeFields, // [{ tag, name }]
     tags: tags.sort(),
   };

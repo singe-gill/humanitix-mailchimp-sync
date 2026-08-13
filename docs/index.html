@@ -269,6 +269,19 @@
     </div>
 
     <div class="card">
+      <h2>Skip cancelled/refunded tickets</h2>
+      <div class="field">
+        <label>Statuses to exclude from syncing (comma-separated, case-insensitive)</label>
+        <input type="text" id="excludeStatuses" placeholder="cancelled, canceled, refunded, void, voided" />
+      </div>
+      <p class="hint" id="excludeStatusesHint">
+        Matches against each ticket's status/financial-status. Click "Refresh options" above and check
+        this list once it's populated — it shows every status value actually seen in your account, so
+        you can confirm the exact spelling Humanitix uses for cancelled/refunded tickets.
+      </p>
+    </div>
+
+    <div class="card">
       <div class="toolbar">
         <button class="primary" id="saveMappingBtn">Save mapping</button>
         <span class="hint" style="margin-top:0">Saved as <code>config.json</code> in the repo. Create matching merge fields in Mailchimp's audience settings first, or values will be dropped.</span>
@@ -307,6 +320,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const GH = "https://api.github.com";
+const DEFAULT_EXCLUDED_STATUSES = ["cancelled", "canceled", "refunded", "void", "voided"];
 let conn = null; // { owner, repo, token }
 let mergeFieldMap = [];
 let tagRules = [];
@@ -563,6 +577,7 @@ async function loadConfig() {
     const res = await fetch(`${GH}/repos/${conn.owner}/${conn.repo}/contents/config.json`, { headers: ghHeaders() });
     if (res.status === 404) {
       mergeFieldMap = []; tagRules = []; emailRouting = []; configSha = null;
+      $("excludeStatuses").value = DEFAULT_EXCLUDED_STATUSES.join(", ");
       renderMergeFields(); renderEmailRouting();
       return;
     }
@@ -576,6 +591,7 @@ async function loadConfig() {
     // config.json as-is so a hand-edited value isn't lost on save.
     tagRules = parsed.tagRules || [];
     emailRouting = parsed.emailRouting || [];
+    $("excludeStatuses").value = (parsed.excludeStatuses || DEFAULT_EXCLUDED_STATUSES).join(", ");
     renderMergeFields();
     renderEmailRouting();
   } catch (err) {
@@ -591,7 +607,8 @@ async function saveConfig() {
       { source: "lastName", mergeTag: "LNAME" },
       ...mergeFieldMap,
     ];
-    const configObj = { mergeFieldMap: fullMergeMap, tagRules, emailRouting };
+    const excludeStatuses = $("excludeStatuses").value.split(",").map((s) => s.trim()).filter(Boolean);
+    const configObj = { mergeFieldMap: fullMergeMap, tagRules, emailRouting, excludeStatuses };
     const content = btoa(unescape(encodeURIComponent(JSON.stringify(configObj, null, 2))));
     const res = await fetch(`${GH}/repos/${conn.owner}/${conn.repo}/contents/config.json`, {
       method: "PUT",
@@ -783,6 +800,12 @@ async function loadOptions() {
     knownTicketTypes = parsed.ticketTypes || [];
     knownTags = parsed.tags || [];
     renderEmailRouting();
+
+    if (parsed.ticketStatuses && parsed.ticketStatuses.length > 0) {
+      $("excludeStatusesHint").innerHTML =
+        `Every status value seen in your account: <code>${parsed.ticketStatuses.map(escapeAttr).join(", ")}</code>. ` +
+        `Matches against each ticket's status/financial-status, case-insensitive.`;
+    }
 
     $("optionsUpdated").textContent = `Last refreshed ${new Date(parsed.updatedAt).toLocaleString()} — ${parsed.checkoutQuestions.length} question(s), ${(parsed.ticketTypes || []).length} ticket type(s), ${parsed.mergeFields.length} merge field(s), ${parsed.tags.length} tag(s).`;
   } catch (err) {

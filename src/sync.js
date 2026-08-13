@@ -1,7 +1,7 @@
 import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
-import { getAllOrders, getAllTickets, getEvent, buildQuestionLabelMap, groupTicketsByOrderId, extractAttendees } from "./humanitix.js";
+import { getAllOrders, getAllTickets, getEvent, buildQuestionLabelMap, groupTicketsByOrderId, extractAttendees, DEFAULT_EXCLUDED_STATUSES } from "./humanitix.js";
 import { buildUpsertOperations, runBatch, waitForBatch } from "./mailchimp.js";
 import { buildMergeFields, buildTags } from "./mapping.js";
 
@@ -67,6 +67,7 @@ async function main() {
   let allOperations = [];
   let previewRecords = [];
   let attendeeCount = 0;
+  let skippedCount = 0;
 
   for (const eventId of eventIds) {
     console.log(`\nFetching event ${eventId}...`);
@@ -98,7 +99,14 @@ async function main() {
       if (cutoff && createdMs && createdMs <= cutoff) continue; // already synced
 
       const ticketsForOrder = ticketsByOrderId.get(order._id || order.id) || [];
-      const attendees = extractAttendees(order, ticketsForOrder, questionLabelMap, config.emailRouting || []);
+      const { attendees, skipped } = extractAttendees(
+        order,
+        ticketsForOrder,
+        questionLabelMap,
+        config.emailRouting || [],
+        config.excludeStatuses || DEFAULT_EXCLUDED_STATUSES
+      );
+      skippedCount += skipped;
       for (const attendee of attendees) {
         if (!attendee.email) continue;
         attendeeCount += 1;
@@ -146,7 +154,7 @@ async function main() {
 
   if (dryRun) {
     console.log(`\n=== DRY RUN — nothing was sent to Mailchimp, state.json was not updated ===`);
-    console.log(`${attendeeCount} attendee(s) would be synced.\n`);
+    console.log(`${attendeeCount} attendee(s) would be synced. ${skippedCount} ticket(s) skipped (cancelled/refunded).\n`);
 
     const tagCounts = new Map();
     const fieldCounts = new Map();
@@ -194,7 +202,7 @@ async function main() {
     return;
   }
 
-  console.log(`\n${attendeeCount} attendee(s) to sync, ${allOperations.length} Mailchimp operation(s).`);
+  console.log(`\n${attendeeCount} attendee(s) to sync, ${allOperations.length} Mailchimp operation(s). ${skippedCount} ticket(s) skipped (cancelled/refunded).`);
 
   if (allOperations.length === 0) {
     console.log("Nothing new to sync.");

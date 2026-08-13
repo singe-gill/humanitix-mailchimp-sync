@@ -2,6 +2,14 @@ import fetch from "node-fetch";
 
 const BASE_URL = "https://api.humanitix.com/v1";
 
+// Default status values (case-insensitive) treated as "not a real attendee,
+// don't sync". Only "complete" has been confirmed against a live account so
+// far - the others are best-guess based on common ticketing platform
+// conventions. Override via config.json's "excludeStatuses", and check
+// docs/options.json's "ticketStatuses" (from Refresh options) to see the
+// actual values your account uses.
+export const DEFAULT_EXCLUDED_STATUSES = ["cancelled", "canceled", "refunded", "void", "voided"];
+
 function headers(apiKey) {
   return {
     "x-api-key": apiKey,
@@ -249,10 +257,28 @@ function resolveTicketContacts(ticket, allQA, order, emailRoutingRules) {
  * when their email differs from the attendee's own. Ticket types not
  * covered by a rule use the default single-contact, auto-detected-email
  * behaviour.
+ *
+ * excludedStatuses (config.json's "excludeStatuses", optional, defaults to
+ * DEFAULT_EXCLUDED_STATUSES) - orders/tickets whose status or financialStatus
+ * matches one of these (case-insensitive) are skipped entirely: a matching
+ * order skips the whole order, a matching ticket skips just that ticket.
+ *
+ * Returns { attendees, skipped } where skipped is the count of tickets that
+ * were excluded for having a matching status.
  */
-export function extractAttendees(order, ticketsForOrder = [], questionLabelMap = {}, emailRoutingRules = []) {
+export function extractAttendees(order, ticketsForOrder = [], questionLabelMap = {}, emailRoutingRules = [], excludedStatuses = DEFAULT_EXCLUDED_STATUSES) {
   const attendees = [];
+  let skipped = 0;
+  const excludedSet = new Set((excludedStatuses || []).map((s) => String(s).toLowerCase()));
+  function isExcluded(...values) {
+    return values.some((v) => v !== undefined && v !== null && excludedSet.has(String(v).toLowerCase()));
+  }
+
   const tickets = ticketsForOrder.length > 0 ? ticketsForOrder : (order.tickets || order.attendees || []);
+
+  if (isExcluded(order.status, order.financialStatus)) {
+    return { attendees: [], skipped: Math.max(tickets.length, 1) };
+  }
 
   const orderLevelQA = [
     ...extractQA(order.additionalFields, questionLabelMap),
@@ -262,6 +288,10 @@ export function extractAttendees(order, ticketsForOrder = [], questionLabelMap =
 
   if (tickets.length > 0) {
     for (const ticket of tickets) {
+      if (isExcluded(ticket.status, ticket.financialStatus)) {
+        skipped += 1;
+        continue;
+      }
       const ticketQA = [
         ...extractQA(ticket.additionalFields, questionLabelMap),
         ...extractQA(ticket.customFieldAnswers, questionLabelMap),
@@ -286,7 +316,7 @@ export function extractAttendees(order, ticketsForOrder = [], questionLabelMap =
     );
   }
 
-  return attendees;
+  return { attendees, skipped };
 }
 
 /** Group a flat ticket list by the order they belong to. */
