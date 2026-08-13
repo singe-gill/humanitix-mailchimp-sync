@@ -1,0 +1,28 @@
+{
+  "mergeFieldMap": [
+    {
+      "source": "firstName",
+      "mergeTag": "FNAME"
+    },
+    {
+      "source": "lastName",
+      "mergeTag": "LNAME"
+    },
+    {
+      "source": "question",
+      "match": "This persons first name",
+      "mergeTag": "FNAME"
+    },
+    {
+      "source": "question",
+      "match": "This persons last name",
+      "mergeTag": "LNAME"
+    },
+    {
+      "source": "question",
+      "match": "This persons email",
+      "mergeTag": "ADDRESS"
+    }
+  ],
+  "tagRules": []
+}
