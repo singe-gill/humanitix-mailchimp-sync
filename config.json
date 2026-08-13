@@ -31,7 +31,18 @@
       "secondary": {
         "emailQuestion": "Account contact email (Parent/Carer)",
         "fullNameQuestion": "Account contact name (Parent/Carer)"
-      }
+      },
+      "tag": "CNF 2027 Camper"
+    },
+    {
+      "ticketType": "Team Member",
+      "primary": {
+        "emailQuestion": "This persons email",
+        "firstNameQuestion": "This persons first name",
+        "lastNameQuestion": "This persons last name"
+      },
+      "secondary": {},
+      "tag": "CNF 2027 Team Member"
     }
   ]
 }
