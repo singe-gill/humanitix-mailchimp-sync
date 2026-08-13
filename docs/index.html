@@ -67,6 +67,12 @@
   }
   input:focus, select:focus { border-color: var(--accent-dim); }
   input::placeholder { color: var(--text-faint); }
+  input[list] {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b93a7' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+  }
 
   button {
     font-family: var(--sans); font-size: 13px; font-weight: 500;
@@ -249,19 +255,14 @@
     </div>
 
     <div class="card">
-      <h2>Tags — checkout answers → Mailchimp tags</h2>
-      <div id="tagRuleTable"></div>
-      <div class="add-row"><button class="ghost small" id="addTagRuleBtn">+ Add tag rule</button></div>
-    </div>
-
-    <div class="card">
-      <h2>Email routing by ticket type</h2>
+      <h2>Tag &amp; email routing by ticket type</h2>
       <p class="hint" style="margin-top:0">
-        By default, each ticket becomes one contact using its own email/name answers.
-        Add a rule here to override that for a specific ticket type — e.g. always use
-        one particular question as the email, or also sync a second contact
+        For each ticket type, choose which existing Mailchimp tag to apply, and
+        optionally override how the contact's email/name is worked out — e.g. always
+        use one particular question as the email, or also sync a second contact
         (like a parent/carer) when their email differs from the attendee's own.
-        Ticket types without a rule keep the default behavior.
+        Ticket types without a rule here get no tag and use the default
+        email/name behavior.
       </p>
       <div id="emailRoutingTable"></div>
       <div class="add-row"><button class="ghost small" id="addEmailRoutingBtn">+ Add ticket type rule</button></div>
@@ -299,7 +300,6 @@
 
   <datalist id="questionOptions"></datalist>
   <datalist id="mergeFieldOptions"></datalist>
-  <datalist id="tagOptions"></datalist>
   <datalist id="ticketTypeOptions"></datalist>
 
 </div>
@@ -312,6 +312,8 @@ let mergeFieldMap = [];
 let tagRules = [];
 let emailRouting = [];
 let configSha = null;
+let knownTicketTypes = [];
+let knownTags = [];
 
 function ghHeaders() {
   return {
@@ -561,7 +563,7 @@ async function loadConfig() {
     const res = await fetch(`${GH}/repos/${conn.owner}/${conn.repo}/contents/config.json`, { headers: ghHeaders() });
     if (res.status === 404) {
       mergeFieldMap = []; tagRules = []; emailRouting = []; configSha = null;
-      renderMergeFields(); renderTagRules(); renderEmailRouting();
+      renderMergeFields(); renderEmailRouting();
       return;
     }
     if (!res.ok) throw new Error(`Failed to load config.json (${res.status})`);
@@ -569,10 +571,12 @@ async function loadConfig() {
     configSha = data.sha;
     const parsed = JSON.parse(decodeURIComponent(escape(atob(data.content))));
     mergeFieldMap = (parsed.mergeFieldMap || []).filter((r) => r.source === "question");
+    // tagRules is no longer editable from this panel - tags are now set per
+    // ticket type in the routing rules below - but we keep whatever's in
+    // config.json as-is so a hand-edited value isn't lost on save.
     tagRules = parsed.tagRules || [];
     emailRouting = parsed.emailRouting || [];
     renderMergeFields();
-    renderTagRules();
     renderEmailRouting();
   } catch (err) {
     setStatus($("mappingStatus"), "err", err.message);
@@ -635,66 +639,6 @@ function renderMergeFields() {
   });
 }
 
-function renderTagRules() {
-  const container = $("tagRuleTable");
-  container.innerHTML = "";
-  if (tagRules.length === 0) {
-    container.innerHTML = `<div class="empty-note">No tag rules yet.</div>`;
-  }
-  tagRules.forEach((rule, i) => {
-    const block = document.createElement("div");
-    block.className = "tag-rule-block";
-
-    const head = document.createElement("div");
-    head.className = "tag-rule-head";
-    const select = document.createElement("select");
-    select.innerHTML = `
-      <option value="static">Always tag every attendee</option>
-      <option value="eventName">Tag with event name</option>
-      <option value="ticketType">Tag with ticket type name</option>
-      <option value="ticketTypeEquals">Tag if ticket type equals…</option>
-      <option value="questionAnswer">Tag with checkout answer</option>
-      <option value="questionAnswerEquals">Tag only if answer equals…</option>
-    `;
-    select.value = rule.type;
-    select.addEventListener("change", () => {
-      rule.type = select.value;
-      renderTagRules();
-    });
-    const spacer = document.createElement("div");
-    spacer.className = "spacer";
-    const removeBtn = document.createElement("button");
-    removeBtn.className = "danger-ghost small";
-    removeBtn.textContent = "✕";
-    removeBtn.addEventListener("click", () => { tagRules.splice(i, 1); renderTagRules(); });
-    head.appendChild(select); head.appendChild(spacer); head.appendChild(removeBtn);
-    block.appendChild(head);
-
-    const body = document.createElement("div");
-    body.className = "rule-table";
-
-    if (rule.type === "static") {
-      body.appendChild(textField("Tag name, e.g. Humanitix Attendee", rule.tag || "", (v) => rule.tag = v, "tagOptions"));
-    } else if (rule.type === "eventName") {
-      body.appendChild(textField("Tag prefix, e.g. \"Event: \" (event name is appended automatically)", rule.prefix ?? "", (v) => rule.prefix = v));
-    } else if (rule.type === "ticketType") {
-      body.appendChild(textField("Tag prefix, e.g. \"Ticket type: \" (ticket type name is appended automatically)", rule.prefix ?? "", (v) => rule.prefix = v));
-    } else if (rule.type === "ticketTypeEquals") {
-      body.appendChild(textField("Ticket type, e.g. Team member", (rule.valueEquals || [])[0] || "", (v) => rule.valueEquals = [v], "ticketTypeOptions"));
-      body.appendChild(textField("Tag to apply, e.g. Staff", rule.tag || "", (v) => rule.tag = v, "tagOptions"));
-    } else if (rule.type === "questionAnswer") {
-      body.appendChild(textField("Checkout question text, e.g. Dietary requirements", rule.match || "", (v) => rule.match = v, "questionOptions"));
-      body.appendChild(textField("Tag prefix, e.g. \"Diet: \" (answer is appended automatically)", rule.prefix ?? "", (v) => rule.prefix = v));
-    } else if (rule.type === "questionAnswerEquals") {
-      body.appendChild(textField("Checkout question text", rule.match || "", (v) => rule.match = v, "questionOptions"));
-      body.appendChild(textField("Match answers (comma-separated), e.g. Yes, yes", (rule.valueEquals || []).join(", "), (v) => rule.valueEquals = v.split(",").map(s => s.trim()).filter(Boolean)));
-      body.appendChild(textField("Tag to apply, e.g. Newsletter Opt-in", rule.tag || "", (v) => rule.tag = v, "tagOptions"));
-    }
-    block.appendChild(body);
-    container.appendChild(block);
-  });
-}
-
 function renderEmailRouting() {
   const container = $("emailRoutingTable");
   container.innerHTML = "";
@@ -708,13 +652,8 @@ function renderEmailRouting() {
 
     const head = document.createElement("div");
     head.className = "tag-rule-head";
-    const ticketTypeInput = document.createElement("input");
-    ticketTypeInput.type = "text";
-    ticketTypeInput.placeholder = "Ticket type, e.g. Camper";
-    ticketTypeInput.value = rule.ticketType || "";
-    ticketTypeInput.setAttribute("list", "ticketTypeOptions");
+    const ticketTypeInput = ticketTypeSelect(rule.ticketType || "", (v) => { rule.ticketType = v; });
     ticketTypeInput.style.flex = "0 0 220px";
-    ticketTypeInput.addEventListener("input", () => rule.ticketType = ticketTypeInput.value);
     const spacer = document.createElement("div");
     spacer.className = "spacer";
     const removeBtn = document.createElement("button");
@@ -723,6 +662,15 @@ function renderEmailRouting() {
     removeBtn.addEventListener("click", () => { emailRouting.splice(i, 1); renderEmailRouting(); });
     head.appendChild(ticketTypeInput); head.appendChild(spacer); head.appendChild(removeBtn);
     block.appendChild(head);
+
+    const tagField = document.createElement("div");
+    tagField.className = "field";
+    tagField.style.margin = "0 0 12px";
+    const tagLabel = document.createElement("label");
+    tagLabel.textContent = "Tag to apply to this ticket type";
+    tagField.appendChild(tagLabel);
+    tagField.appendChild(tagSelect(rule.tag || "", (v) => { rule.tag = v; }));
+    block.appendChild(tagField);
 
     const body = document.createElement("div");
     body.className = "rule-table";
@@ -768,6 +716,35 @@ function renderEmailRouting() {
   });
 }
 
+function ticketTypeSelect(currentValue, onChange) {
+  const select = document.createElement("select");
+  const options = [...knownTicketTypes];
+  if (currentValue && !options.includes(currentValue)) options.unshift(currentValue);
+  select.innerHTML =
+    `<option value="">Choose ticket type…</option>` +
+    options.map((t) => `<option value="${escapeAttr(t)}"${t === currentValue ? " selected" : ""}>${escapeAttr(t)}</option>`).join("");
+  if (knownTicketTypes.length === 0) {
+    select.innerHTML = `<option value="">No ticket types found yet — click Refresh options</option>` +
+      (currentValue ? `<option value="${escapeAttr(currentValue)}" selected>${escapeAttr(currentValue)}</option>` : "");
+  }
+  select.addEventListener("change", () => onChange(select.value));
+  return select;
+}
+
+function tagSelect(currentValue, onChange) {
+  const select = document.createElement("select");
+  const options = [...knownTags];
+  if (currentValue && !options.includes(currentValue)) options.unshift(currentValue);
+  select.innerHTML =
+    `<option value="">No tag</option>` +
+    options.map((t) => `<option value="${escapeAttr(t)}"${t === currentValue ? " selected" : ""}>${escapeAttr(t)}</option>`).join("");
+  if (knownTags.length === 0 && !currentValue) {
+    select.innerHTML = `<option value="">No tags found yet — create one in Mailchimp, then click Refresh options</option>`;
+  }
+  select.addEventListener("change", () => onChange(select.value));
+  return select;
+}
+
 function textField(placeholder, value, onChange, listId) {
   const wrap = document.createElement("div");
   const input = document.createElement("input");
@@ -801,10 +778,11 @@ async function loadOptions() {
       .map((q) => `<option value="${escapeAttr(q)}">`).join("");
     $("mergeFieldOptions").innerHTML = (parsed.mergeFields || [])
       .map((f) => `<option value="${escapeAttr(f.tag)}">${escapeAttr(f.name)}</option>`).join("");
-    $("tagOptions").innerHTML = (parsed.tags || [])
-      .map((t) => `<option value="${escapeAttr(t)}">`).join("");
     $("ticketTypeOptions").innerHTML = (parsed.ticketTypes || [])
       .map((t) => `<option value="${escapeAttr(t)}">`).join("");
+    knownTicketTypes = parsed.ticketTypes || [];
+    knownTags = parsed.tags || [];
+    renderEmailRouting();
 
     $("optionsUpdated").textContent = `Last refreshed ${new Date(parsed.updatedAt).toLocaleString()} — ${parsed.checkoutQuestions.length} question(s), ${(parsed.ticketTypes || []).length} ticket type(s), ${parsed.mergeFields.length} merge field(s), ${parsed.tags.length} tag(s).`;
   } catch (err) {
@@ -921,7 +899,6 @@ $("saveMappingBtn").addEventListener("click", saveConfig);
 $("runNowBtn").addEventListener("click", () => runNow(false));
 $("dryRunBtn").addEventListener("click", () => runNow(true));
 $("addMergeFieldBtn").addEventListener("click", () => { mergeFieldMap.push({ source: "question", match: "", mergeTag: "" }); renderMergeFields(); });
-$("addTagRuleBtn").addEventListener("click", () => { tagRules.push({ type: "static", tag: "" }); renderTagRules(); });
 $("addEmailRoutingBtn").addEventListener("click", () => { emailRouting.push({ ticketType: "", primary: { emailQuestion: "", firstNameQuestion: "", lastNameQuestion: "" } }); renderEmailRouting(); });
 $("refreshOptionsBtn").addEventListener("click", refreshOptions);
 $("refreshAccountsBtn").addEventListener("click", refreshAccounts);

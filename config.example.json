@@ -3,8 +3,9 @@
 
   "emailRouting": [
     {
-      "_comment": "Team members: sync one contact, using their own email/name questions.",
+      "_comment": "Team members: sync one contact, using their own email/name questions, tagged 'Staff'.",
       "ticketType": "Team member",
+      "tag": "Staff",
       "primary": {
         "emailQuestion": "This persons email",
         "firstNameQuestion": "This persons first name",
@@ -12,8 +13,9 @@
       }
     },
     {
-      "_comment": "Campers: sync the camper as a contact, plus a second contact for the parent/carer ONLY if their email differs from the camper's.",
+      "_comment": "Campers: sync the camper as a contact (tagged 'Camp Attendee'), plus a second contact for the parent/carer ONLY if their email differs from the camper's. The tag applies to both contacts.",
       "ticketType": "Camper",
+      "tag": "Camp Attendee",
       "primary": {
         "emailQuestion": "This persons email",
         "firstNameQuestion": "This persons first name",
@@ -49,45 +51,5 @@
     }
   ],
 
-  "tagRules": [
-    {
-      "_comment": "Every synced attendee gets this tag, useful for building a segment of 'all event attendees'",
-      "type": "static",
-      "tag": "Humanitix Attendee"
-    },
-    {
-      "_comment": "One tag per event, so you can email attendees of a specific event",
-      "type": "eventName",
-      "prefix": "Event: "
-    },
-    {
-      "_comment": "Tags by ticket type name, e.g. 'Ticket type: Camper' / 'Ticket type: Team member'",
-      "type": "ticketType",
-      "prefix": "Ticket type: "
-    },
-    {
-      "_comment": "Custom tag text per ticket type, independent of the ticket type's own name - one rule per type",
-      "type": "ticketTypeEquals",
-      "valueEquals": ["Team member"],
-      "tag": "Staff"
-    },
-    {
-      "type": "ticketTypeEquals",
-      "valueEquals": ["Camper"],
-      "tag": "Camp Attendee"
-    },
-    {
-      "_comment": "Tags based on a checkout question's answer. Answer text becomes part of the tag.",
-      "type": "questionAnswer",
-      "match": "Dietary requirements",
-      "prefix": "Diet: "
-    },
-    {
-      "_comment": "Tag only applied when the answer matches one of the listed values (case-insensitive)",
-      "type": "questionAnswerEquals",
-      "match": "Would you like to join our newsletter?",
-      "valueEquals": ["Yes", "yes"],
-      "tag": "Newsletter Opt-in"
-    }
-  ]
+  "tagRules": []
 }

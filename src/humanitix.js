@@ -149,7 +149,7 @@ function splitFullName(fullName) {
   return { firstName: trimmed.slice(0, spaceIndex), lastName: trimmed.slice(spaceIndex + 1).trim() };
 }
 
-function makeContact({ email, firstName, lastName, orderId, ticketId, createdAt, answers, ticketTypeName }) {
+function makeContact({ email, firstName, lastName, orderId, ticketId, createdAt, answers, ticketTypeName, ticketTypeTag }) {
   return {
     email: String(email).toLowerCase().trim(),
     firstName: firstName || "",
@@ -159,6 +159,7 @@ function makeContact({ email, firstName, lastName, orderId, ticketId, createdAt,
     createdAt,
     answers,
     ticketTypeName: ticketTypeName || "",
+    ticketTypeTag: ticketTypeTag || "",
   };
 }
 
@@ -183,6 +184,7 @@ function resolveTicketContacts(ticket, allQA, order, emailRoutingRules) {
     createdAt: order.createdAt || order.orderDate,
     answers: allQA,
     ticketTypeName,
+    ticketTypeTag: rule?.tag || "",
   };
 
   if (!rule) {

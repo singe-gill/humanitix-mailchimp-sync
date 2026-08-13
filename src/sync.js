@@ -104,7 +104,11 @@ async function main() {
         attendeeCount += 1;
 
         const mergeFields = buildMergeFields(attendee, config.mergeFieldMap || []);
-        const tags = buildTags(attendee, config.tagRules || [], eventName);
+        // tagRules (legacy/advanced, hand-edited in config.json) combined
+        // with the tag configured per ticket type in emailRouting rules.
+        const tagSet = new Set(buildTags(attendee, config.tagRules || [], eventName));
+        if (attendee.ticketTypeTag) tagSet.add(attendee.ticketTypeTag);
+        const tags = Array.from(tagSet);
 
         if (dryRun) {
           previewRecords.push({
