@@ -120,11 +120,32 @@ from GitHub any time from Settings → Developer settings → Personal access
 tokens.
 
 From the control panel you can:
-- Set which Humanitix event IDs to sync and your Mailchimp list ID
+- Pick which Humanitix events to sync and your Mailchimp audience by name,
+  via **Refresh events & audiences** — no more hunting for IDs. This runs
+  its own small GitHub Actions job (`discover-accounts.yml`) that only needs
+  your API keys (already set as Secrets), so it works even on a totally
+  fresh setup before anything else is configured.
 - Build merge-field and tag mapping rules with plain forms instead of
   hand-editing `config.json`
 - Trigger a sync immediately (with a full-backfill option) and watch its
   status in Recent Runs, which links to the full GitHub Actions log
+- Click **Refresh options** to scan your recent orders for real checkout
+  question text and ask Mailchimp what merge fields/tags already exist, so
+  the question/field/tag inputs above offer autocomplete suggestions instead
+  of you needing to go look up exact spellings. This runs as a separate
+  GitHub Actions job (`discover-options.yml`) using your real API keys
+  server-side — the browser only ever receives the resulting list of names,
+  never the keys themselves — and writes the results to `docs/options.json`.
+  Takes 30–60 seconds; the button polls until it's done. You can also just
+  run `npm run discover-options` locally instead if you'd rather not wait.
+
+Note the question/field/tag inputs are autocomplete, not locked dropdowns —
+you can still type something not in the suggested list (e.g. a checkout
+question from an event you haven't run Refresh options against yet, or a
+brand-new Mailchimp merge field). If an event doesn't show up in the events
+list, you can still add its ID manually in the "Other event IDs" field.
+Refresh again after adding new events, checkout questions, or merge fields
+so the suggestions stay current.
 
 ## A note on consent
 
@@ -148,3 +169,7 @@ newsletter" checkout question and gate tagging/subscription on that answer
 | `config.json` | Your question → merge field / tag mapping (not committed by default in example) |
 | `state.json` | Auto-generated; tracks last synced timestamp per event |
 | `docs/index.html` | Browser control panel (GitHub Pages) for settings + manual runs |
+| `docs/options.json` | Auto-generated; discovered checkout questions / merge fields / tags for the control panel's autocomplete |
+| `docs/accounts.json` | Auto-generated; discovered Humanitix events / Mailchimp audiences for the control panel's pickers |
+| `src/discover-options.js` | Scans orders + Mailchimp to produce `docs/options.json` |
+| `src/discover-accounts.js` | Lists events + audiences to produce `docs/accounts.json` |

@@ -82,6 +82,42 @@ export async function runBatch({ apiKey, serverPrefix, operations }) {
   return res.json(); // contains { id, status, ... } - poll /batches/{id} if you want completion status
 }
 
+/** List Mailchimp audiences on this account (for picking which one to sync into). */
+export async function listAudiences({ apiKey, serverPrefix }) {
+  const res = await fetch(`${baseUrl(serverPrefix)}/lists?count=100`, {
+    headers: { Authorization: authHeader(apiKey) },
+  });
+  if (!res.ok) throw new Error(`Failed to list audiences (${res.status})`);
+  const data = await res.json();
+  return (data.lists || []).map((l) => ({
+    id: l.id,
+    name: l.name,
+    memberCount: l.stats?.member_count,
+  }));
+}
+
+/** List merge fields defined on the audience (Audience > Settings > Audience fields). */
+export async function listMergeFields({ apiKey, serverPrefix, listId }) {
+  const res = await fetch(
+    `${baseUrl(serverPrefix)}/lists/${listId}/merge-fields?count=100`,
+    { headers: { Authorization: authHeader(apiKey) } }
+  );
+  if (!res.ok) throw new Error(`Failed to list merge fields (${res.status})`);
+  const data = await res.json();
+  return (data.merge_fields || []).map((f) => ({ tag: f.tag, name: f.name }));
+}
+
+/** List existing tags on the audience. Mailchimp implements tags as static segments. */
+export async function listTags({ apiKey, serverPrefix, listId }) {
+  const res = await fetch(
+    `${baseUrl(serverPrefix)}/lists/${listId}/segments?type=static&count=1000`,
+    { headers: { Authorization: authHeader(apiKey) } }
+  );
+  if (!res.ok) throw new Error(`Failed to list tags (${res.status})`);
+  const data = await res.json();
+  return (data.segments || []).map((s) => s.name);
+}
+
 /** Poll a batch until it finishes (optional, useful for the manual/pre-send run). */
 export async function waitForBatch({ apiKey, serverPrefix, batchId, timeoutMs = 120000 }) {
   const start = Date.now();

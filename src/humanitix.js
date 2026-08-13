@@ -23,6 +23,21 @@ export async function getEvent(apiKey, eventId) {
   return get(`/events/${eventId}`, apiKey);
 }
 
+/** Fetch ALL events on the account (for picking which ones to sync), paginating until exhausted. */
+export async function getAllEvents(apiKey, { pageSize = 100 } = {}) {
+  const all = [];
+  let page = 1;
+  while (true) {
+    const data = await get(`/events?page=${page}&pageSize=${pageSize}`, apiKey);
+    const events = data.events || data.data || [];
+    all.push(...events);
+    if (events.length < pageSize) break;
+    page += 1;
+    if (page > 100) break; // safety valve
+  }
+  return all.map((e) => ({ id: e._id || e.id, name: e.name || e.eventName || "(untitled event)" }));
+}
+
 /**
  * Fetch ALL orders for an event, paginating until exhausted.
  * NOTE: field names below (page/pageSize/total, orders array shape) are based

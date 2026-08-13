@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "discover": "node src/discover.js",
+    "discover-options": "node src/discover-options.js",
+    "discover-accounts": "node src/discover-accounts.js",
     "sync": "node src/sync.js"
   },
   "dependencies": {

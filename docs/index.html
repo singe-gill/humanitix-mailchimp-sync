@@ -135,6 +135,19 @@
 
   .gated { opacity: 0.4; pointer-events: none; filter: grayscale(0.4); }
   .empty-note { color: var(--text-faint); font-size: 12.5px; font-style: italic; padding: 6px 0; }
+
+  .event-picker {
+    display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow-y: auto;
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px; background: var(--surface-2);
+  }
+  .event-picker label {
+    display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px;
+    font-family: var(--sans); font-size: 13px; color: var(--text); cursor: pointer; margin: 0;
+  }
+  .event-picker label:hover { background: rgba(255,255,255,0.03); }
+  .event-picker input { width: auto; flex-shrink: 0; }
+  .event-picker .ev-name { flex: 1; }
+  .event-picker .ev-id { color: var(--text-faint); font-family: var(--mono); font-size: 11px; }
 </style>
 </head>
 <body>
@@ -173,16 +186,31 @@
 
     <div class="card">
       <h2>Sync targets</h2>
-      <div class="row">
-        <div class="field">
-          <label>Humanitix event IDs (comma-separated)</label>
-          <input type="text" id="eventIds" placeholder="64f1a2..., 64f1b7..." />
-        </div>
+      <div class="toolbar">
+        <button class="ghost small" id="refreshAccountsBtn">Refresh events &amp; audiences</button>
+        <span class="hint" id="accountsUpdated" style="margin-top:0">Not loaded yet.</span>
       </div>
-      <div class="row">
+      <div class="status-line" id="accountsStatus"></div>
+
+      <div class="field" style="margin-top:16px">
+        <label>Humanitix events to sync</label>
+        <div id="eventPicker" class="empty-note">Click "Refresh events &amp; audiences" above to list your events.</div>
+      </div>
+      <div class="field" style="margin-top:10px">
+        <label>Other event IDs (comma-separated, for events not listed above)</label>
+        <input type="text" id="eventIdsManual" placeholder="64f1a2..." />
+      </div>
+
+      <div class="row" style="margin-top:16px">
         <div class="field">
-          <label>Mailchimp list / audience ID</label>
-          <input type="text" id="listId" placeholder="a1b2c3d4e5" />
+          <label>Mailchimp audience</label>
+          <select id="listIdPicker">
+            <option value="">Click "Refresh events &amp; audiences" above to list your audiences</option>
+          </select>
+        </div>
+        <div class="field" id="listIdManualWrap" style="display:none">
+          <label>Audience ID</label>
+          <input type="text" id="listIdManual" placeholder="a1b2c3d4e5" />
         </div>
         <div class="field">
           <label>New contact status</label>
@@ -192,11 +220,26 @@
           </select>
         </div>
       </div>
-      <div class="toolbar">
+      <div class="toolbar" style="margin-top:10px">
         <button class="primary small" id="saveTargetsBtn">Save targets</button>
         <span class="hint" style="margin-top:0">Saved as repo Actions Variables. API keys aren't managed here — set those once as repo Secrets in GitHub directly.</span>
       </div>
       <div class="status-line" id="targetsStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2>Field &amp; tag options</h2>
+      <div class="toolbar">
+        <button class="ghost small" id="refreshOptionsBtn">Refresh options</button>
+        <span class="hint" id="optionsUpdated" style="margin-top:0">Not loaded yet.</span>
+      </div>
+      <p class="hint">
+        Scans your recent Humanitix orders for real checkout question text, and asks
+        Mailchimp what merge fields and tags already exist — so the fields below can
+        suggest options instead of you having to go look them up. Takes ~30–60s;
+        this runs a GitHub Actions job with your real API keys, which never reach this page.
+      </p>
+      <div class="status-line" id="optionsStatus"></div>
     </div>
 
     <div class="card">
@@ -234,6 +277,10 @@
     </div>
 
   </div>
+
+  <datalist id="questionOptions"></datalist>
+  <datalist id="mergeFieldOptions"></datalist>
+  <datalist id="tagOptions"></datalist>
 
 </div>
 
@@ -290,7 +337,7 @@ async function connect() {
     $("connDot").classList.add("connected");
     $("appBody").classList.remove("gated");
     $("disconnectBtn").style.display = "inline-block";
-    await Promise.all([loadTargets(), loadConfig(), loadRuns()]);
+    await Promise.all([loadTargets(), loadConfig(), loadRuns(), loadOptions(), loadAccounts()]);
   } catch (err) {
     setStatus($("connectStatus"), "err", err.message);
     conn = null;
@@ -334,23 +381,155 @@ async function loadTargets() {
       getVariable("MAILCHIMP_LIST_ID"),
       getVariable("MAILCHIMP_STATUS_IF_NEW"),
     ]);
-    $("eventIds").value = eventIds || "";
-    $("listId").value = listId || "";
+    savedEventIds = (eventIds || "").split(",").map((s) => s.trim()).filter(Boolean);
+    savedListId = listId || "";
     $("statusIfNew").value = statusIfNew || "subscribed";
+    applyEventSelection();
+    applyListSelection();
   } catch (err) {
     setStatus($("targetsStatus"), "err", err.message);
   }
 }
 
+function currentEventIds() {
+  const checked = Array.from(document.querySelectorAll(".event-picker input:checked")).map((i) => i.value);
+  const manual = $("eventIdsManual").value.split(",").map((s) => s.trim()).filter(Boolean);
+  return Array.from(new Set([...checked, ...manual]));
+}
+
+function currentListId() {
+  const picked = $("listIdPicker").value;
+  return picked === "__custom__" ? $("listIdManual").value.trim() : picked;
+}
+
 async function saveTargets() {
   setStatus($("targetsStatus"), "pending", "Saving…");
   try {
-    await setVariable("HUMANITIX_EVENT_IDS", $("eventIds").value.trim());
-    await setVariable("MAILCHIMP_LIST_ID", $("listId").value.trim());
+    await setVariable("HUMANITIX_EVENT_IDS", currentEventIds().join(","));
+    await setVariable("MAILCHIMP_LIST_ID", currentListId());
     await setVariable("MAILCHIMP_STATUS_IF_NEW", $("statusIfNew").value);
     setStatus($("targetsStatus"), "ok", "Saved.");
   } catch (err) {
     setStatus($("targetsStatus"), "err", err.message);
+  }
+}
+
+// ---------- Accounts (Humanitix events / Mailchimp audiences) ----------
+
+let savedEventIds = [];
+let savedListId = "";
+let knownEvents = [];
+let knownAudiences = [];
+
+function applyEventSelection() {
+  const known = new Set(knownEvents.map((e) => e.id));
+  document.querySelectorAll(".event-picker input").forEach((cb) => {
+    cb.checked = savedEventIds.includes(cb.value);
+  });
+  $("eventIdsManual").value = savedEventIds.filter((id) => !known.has(id)).join(", ");
+}
+
+function applyListSelection() {
+  const select = $("listIdPicker");
+  const known = knownAudiences.some((a) => a.id === savedListId);
+  if (savedListId && !known && select.querySelector('option[value="__custom__"]')) {
+    select.value = "__custom__";
+    $("listIdManualWrap").style.display = "";
+    $("listIdManual").value = savedListId;
+  } else if (known) {
+    select.value = savedListId;
+    $("listIdManualWrap").style.display = "none";
+  }
+}
+
+async function loadAccounts() {
+  try {
+    const res = await fetch(`${GH}/repos/${conn.owner}/${conn.repo}/contents/docs/accounts.json`, { headers: ghHeaders() });
+    if (res.status === 404) {
+      $("accountsUpdated").textContent = "Never refreshed yet — click the button above.";
+      return;
+    }
+    if (!res.ok) throw new Error(`Failed to load accounts (${res.status})`);
+    const data = await res.json();
+    const parsed = JSON.parse(decodeURIComponent(escape(atob(data.content))));
+    knownEvents = parsed.events || [];
+    knownAudiences = parsed.audiences || [];
+    renderEventPicker();
+    renderListPicker();
+    applyEventSelection();
+    applyListSelection();
+    $("accountsUpdated").textContent = `Last refreshed ${new Date(parsed.updatedAt).toLocaleString()} — ${knownEvents.length} event(s), ${knownAudiences.length} audience(s).`;
+  } catch (err) {
+    $("accountsUpdated").textContent = "Couldn't load events/audiences.";
+    setStatus($("accountsStatus"), "err", err.message);
+  }
+}
+
+function renderEventPicker() {
+  const el = $("eventPicker");
+  if (knownEvents.length === 0) {
+    el.innerHTML = `<div class="empty-note">No events found on this Humanitix account.</div>`;
+    return;
+  }
+  el.className = "event-picker";
+  el.innerHTML = knownEvents.map((e) => `
+    <label>
+      <input type="checkbox" value="${escapeAttr(e.id)}" />
+      <span class="ev-name">${escapeAttr(e.name)}</span>
+      <span class="ev-id">${escapeAttr(e.id)}</span>
+    </label>
+  `).join("");
+}
+
+function renderListPicker() {
+  const select = $("listIdPicker");
+  select.innerHTML =
+    `<option value="">Choose an audience…</option>` +
+    knownAudiences.map((a) => `<option value="${escapeAttr(a.id)}">${escapeAttr(a.name)}${a.memberCount != null ? ` (${a.memberCount} contacts)` : ""}</option>`).join("") +
+    `<option value="__custom__">Other (enter ID manually)</option>`;
+  select.onchange = () => {
+    $("listIdManualWrap").style.display = select.value === "__custom__" ? "" : "none";
+  };
+}
+
+async function refreshAccounts() {
+  setStatus($("accountsStatus"), "pending", "Triggering refresh…");
+  $("refreshAccountsBtn").disabled = true;
+  try {
+    const repoInfo = await (await fetch(`${GH}/repos/${conn.owner}/${conn.repo}`, { headers: ghHeaders() })).json();
+    const branch = repoInfo.default_branch || "main";
+    const res = await fetch(`${GH}/repos/${conn.owner}/${conn.repo}/actions/workflows/discover-accounts.yml/dispatches`, {
+      method: "POST",
+      headers: { ...ghHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ ref: branch }),
+    });
+    if (!res.ok) throw new Error(`Trigger failed (${res.status})`);
+
+    setStatus($("accountsStatus"), "pending", "Running — this takes ~15–30s…");
+    const dispatchedAt = Date.now();
+    for (let i = 0; i < 40; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const runsRes = await fetch(`${GH}/repos/${conn.owner}/${conn.repo}/actions/workflows/discover-accounts.yml/runs?per_page=1`, { headers: ghHeaders() });
+      const runsData = await runsRes.json();
+      const run = runsData.workflow_runs?.[0];
+      if (run && new Date(run.created_at).getTime() >= dispatchedAt - 5000) {
+        if (run.status === "completed") {
+          if (run.conclusion === "success") {
+            setStatus($("accountsStatus"), "ok", "Refreshed.");
+            await loadAccounts();
+          } else {
+            setStatus($("accountsStatus"), "err", `Run finished with status: ${run.conclusion}. Check the Actions log.`);
+          }
+          $("refreshAccountsBtn").disabled = false;
+          return;
+        }
+      }
+    }
+    setStatus($("accountsStatus"), "err", "Taking longer than expected — check the Actions tab.");
+  } catch (err) {
+    setStatus($("accountsStatus"), "err", err.message);
+  } finally {
+    $("refreshAccountsBtn").disabled = false;
   }
 }
 
@@ -415,9 +594,9 @@ function renderMergeFields() {
     const row = document.createElement("div");
     row.className = "rule-row";
     row.innerHTML = `
-      <input type="text" placeholder="Checkout question text, e.g. Company" value="${escapeAttr(rule.match || "")}" data-field="match" />
+      <input type="text" placeholder="Checkout question text, e.g. Company" value="${escapeAttr(rule.match || "")}" data-field="match" list="questionOptions" />
       <span class="arrow">→</span>
-      <input type="text" placeholder="Mailchimp merge tag, e.g. COMPANY" value="${escapeAttr(rule.mergeTag || "")}" data-field="mergeTag" style="text-transform:uppercase" />
+      <input type="text" placeholder="Mailchimp merge tag, e.g. COMPANY" value="${escapeAttr(rule.mergeTag || "")}" data-field="mergeTag" style="text-transform:uppercase" list="mergeFieldOptions" />
       <button class="danger-ghost small" title="Remove">✕</button>
     `;
     row.querySelectorAll("input").forEach((inp) => {
@@ -470,28 +649,29 @@ function renderTagRules() {
     body.className = "rule-table";
 
     if (rule.type === "static") {
-      body.appendChild(textField("Tag name, e.g. Humanitix Attendee", rule.tag || "", (v) => rule.tag = v));
+      body.appendChild(textField("Tag name, e.g. Humanitix Attendee", rule.tag || "", (v) => rule.tag = v, "tagOptions"));
     } else if (rule.type === "eventName") {
       body.appendChild(textField("Tag prefix, e.g. \"Event: \" (event name is appended automatically)", rule.prefix ?? "", (v) => rule.prefix = v));
     } else if (rule.type === "questionAnswer") {
-      body.appendChild(textField("Checkout question text, e.g. Dietary requirements", rule.match || "", (v) => rule.match = v));
+      body.appendChild(textField("Checkout question text, e.g. Dietary requirements", rule.match || "", (v) => rule.match = v, "questionOptions"));
       body.appendChild(textField("Tag prefix, e.g. \"Diet: \" (answer is appended automatically)", rule.prefix ?? "", (v) => rule.prefix = v));
     } else if (rule.type === "questionAnswerEquals") {
-      body.appendChild(textField("Checkout question text", rule.match || "", (v) => rule.match = v));
+      body.appendChild(textField("Checkout question text", rule.match || "", (v) => rule.match = v, "questionOptions"));
       body.appendChild(textField("Match answers (comma-separated), e.g. Yes, yes", (rule.valueEquals || []).join(", "), (v) => rule.valueEquals = v.split(",").map(s => s.trim()).filter(Boolean)));
-      body.appendChild(textField("Tag to apply, e.g. Newsletter Opt-in", rule.tag || "", (v) => rule.tag = v));
+      body.appendChild(textField("Tag to apply, e.g. Newsletter Opt-in", rule.tag || "", (v) => rule.tag = v, "tagOptions"));
     }
     block.appendChild(body);
     container.appendChild(block);
   });
 }
 
-function textField(placeholder, value, onChange) {
+function textField(placeholder, value, onChange, listId) {
   const wrap = document.createElement("div");
   const input = document.createElement("input");
   input.type = "text";
   input.placeholder = placeholder;
   input.value = value;
+  if (listId) input.setAttribute("list", listId);
   input.addEventListener("input", () => onChange(input.value));
   wrap.appendChild(input);
   return wrap;
@@ -499,6 +679,75 @@ function textField(placeholder, value, onChange) {
 
 function escapeAttr(s) {
   return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+}
+
+// ---------- Options (discovered checkout questions / merge fields / tags) ----------
+
+async function loadOptions() {
+  try {
+    const res = await fetch(`${GH}/repos/${conn.owner}/${conn.repo}/contents/docs/options.json`, { headers: ghHeaders() });
+    if (res.status === 404) {
+      $("optionsUpdated").textContent = "Never refreshed yet — click Refresh options below.";
+      return;
+    }
+    if (!res.ok) throw new Error(`Failed to load options (${res.status})`);
+    const data = await res.json();
+    const parsed = JSON.parse(decodeURIComponent(escape(atob(data.content))));
+
+    $("questionOptions").innerHTML = (parsed.checkoutQuestions || [])
+      .map((q) => `<option value="${escapeAttr(q)}">`).join("");
+    $("mergeFieldOptions").innerHTML = (parsed.mergeFields || [])
+      .map((f) => `<option value="${escapeAttr(f.tag)}">${escapeAttr(f.name)}</option>`).join("");
+    $("tagOptions").innerHTML = (parsed.tags || [])
+      .map((t) => `<option value="${escapeAttr(t)}">`).join("");
+
+    $("optionsUpdated").textContent = `Last refreshed ${new Date(parsed.updatedAt).toLocaleString()} — ${parsed.checkoutQuestions.length} question(s), ${parsed.mergeFields.length} merge field(s), ${parsed.tags.length} tag(s).`;
+  } catch (err) {
+    $("optionsUpdated").textContent = "Couldn't load options.";
+    setStatus($("optionsStatus"), "err", err.message);
+  }
+}
+
+async function refreshOptions() {
+  setStatus($("optionsStatus"), "pending", "Triggering refresh…");
+  $("refreshOptionsBtn").disabled = true;
+  try {
+    const repoInfo = await (await fetch(`${GH}/repos/${conn.owner}/${conn.repo}`, { headers: ghHeaders() })).json();
+    const branch = repoInfo.default_branch || "main";
+    const res = await fetch(`${GH}/repos/${conn.owner}/${conn.repo}/actions/workflows/discover-options.yml/dispatches`, {
+      method: "POST",
+      headers: { ...ghHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ ref: branch }),
+    });
+    if (!res.ok) throw new Error(`Trigger failed (${res.status})`);
+
+    setStatus($("optionsStatus"), "pending", "Running — this takes ~30–60s…");
+    // Poll the workflow run until it completes, then reload options.json.
+    const dispatchedAt = Date.now();
+    for (let i = 0; i < 40; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const runsRes = await fetch(`${GH}/repos/${conn.owner}/${conn.repo}/actions/workflows/discover-options.yml/runs?per_page=1`, { headers: ghHeaders() });
+      const runsData = await runsRes.json();
+      const run = runsData.workflow_runs?.[0];
+      if (run && new Date(run.created_at).getTime() >= dispatchedAt - 5000) {
+        if (run.status === "completed") {
+          if (run.conclusion === "success") {
+            setStatus($("optionsStatus"), "ok", "Refreshed.");
+            await loadOptions();
+          } else {
+            setStatus($("optionsStatus"), "err", `Run finished with status: ${run.conclusion}. Check the Actions log.`);
+          }
+          $("refreshOptionsBtn").disabled = false;
+          return;
+        }
+      }
+    }
+    setStatus($("optionsStatus"), "err", "Taking longer than expected — check the Actions tab.");
+  } catch (err) {
+    setStatus($("optionsStatus"), "err", err.message);
+  } finally {
+    $("refreshOptionsBtn").disabled = false;
+  }
 }
 
 // ---------- Runs ----------
@@ -562,6 +811,8 @@ $("saveMappingBtn").addEventListener("click", saveConfig);
 $("runNowBtn").addEventListener("click", runNow);
 $("addMergeFieldBtn").addEventListener("click", () => { mergeFieldMap.push({ source: "question", match: "", mergeTag: "" }); renderMergeFields(); });
 $("addTagRuleBtn").addEventListener("click", () => { tagRules.push({ type: "static", tag: "" }); renderTagRules(); });
+$("refreshOptionsBtn").addEventListener("click", refreshOptions);
+$("refreshAccountsBtn").addEventListener("click", refreshAccounts);
 
 loadSavedConn();
 </script>
