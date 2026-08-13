@@ -265,9 +265,15 @@
     <div class="card">
       <h2>Run sync now</h2>
       <div class="toolbar">
+        <button class="ghost" id="dryRunBtn">Dry run (preview only)</button>
         <button class="primary" id="runNowBtn">Sync now</button>
         <label class="checkbox-line"><input type="checkbox" id="fullBackfill" /> Full backfill (all attendees, not just new)</label>
       </div>
+      <label class="checkbox-line" style="margin-top:8px">
+        <input type="checkbox" id="showDetails" />
+        Show per-attendee emails/answers in the run log (only enable if you're sure this repo's Actions logs are private)
+      </label>
+      <p class="hint">Dry run computes everything but writes nothing to Mailchimp and doesn't advance the sync checkpoint — safe to run as many times as you like. Check the Actions log for tag/field counts, or enable the option above for full per-attendee detail.</p>
       <div class="status-line" id="runStatus"></div>
     </div>
 
@@ -781,8 +787,8 @@ async function loadRuns() {
   }
 }
 
-async function runNow() {
-  setStatus($("runStatus"), "pending", "Triggering workflow…");
+async function runNow(dryRun) {
+  setStatus($("runStatus"), "pending", dryRun ? "Triggering dry run…" : "Triggering sync…");
   try {
     const repoInfo = await (await fetch(`${GH}/repos/${conn.owner}/${conn.repo}`, { headers: ghHeaders() })).json();
     const branch = repoInfo.default_branch || "main";
@@ -791,11 +797,16 @@ async function runNow() {
       headers: { ...ghHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({
         ref: branch,
-        inputs: { full: $("fullBackfill").checked ? "true" : "false", wait: "true" },
+        inputs: {
+          full: $("fullBackfill").checked ? "true" : "false",
+          wait: "true",
+          dryRun: dryRun ? "true" : "false",
+          showDetails: $("showDetails").checked ? "true" : "false",
+        },
       }),
     });
     if (!res.ok) throw new Error(`Trigger failed (${res.status})`);
-    setStatus($("runStatus"), "ok", "Triggered. Check Recent runs in a few seconds.");
+    setStatus($("runStatus"), "ok", (dryRun ? "Dry run triggered." : "Sync triggered.") + " Check Recent runs, then open the run's \"Run sync\" step to see the log.");
     setTimeout(loadRuns, 4000);
   } catch (err) {
     setStatus($("runStatus"), "err", err.message);
@@ -808,7 +819,8 @@ $("connectBtn").addEventListener("click", connect);
 $("disconnectBtn").addEventListener("click", disconnect);
 $("saveTargetsBtn").addEventListener("click", saveTargets);
 $("saveMappingBtn").addEventListener("click", saveConfig);
-$("runNowBtn").addEventListener("click", runNow);
+$("runNowBtn").addEventListener("click", () => runNow(false));
+$("dryRunBtn").addEventListener("click", () => runNow(true));
 $("addMergeFieldBtn").addEventListener("click", () => { mergeFieldMap.push({ source: "question", match: "", mergeTag: "" }); renderMergeFields(); });
 $("addTagRuleBtn").addEventListener("click", () => { tagRules.push({ type: "static", tag: "" }); renderTagRules(); });
 $("refreshOptionsBtn").addEventListener("click", refreshOptions);

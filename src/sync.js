@@ -54,7 +54,18 @@ async function main() {
   // for a one-off backfill of every attendee, ever.
   const fullSync = process.argv.includes("--full");
 
+  // Dry run: compute everything, write nothing to Mailchimp, don't advance
+  // the sync checkpoint (so a real run afterward still picks up everyone).
+  const dryRun = process.argv.includes("--dry-run");
+  // Print full per-attendee detail (emails, names, checkout answers) to the
+  // console/log. Off by default when running in GitHub Actions, since a
+  // public repo's Actions logs are publicly visible - pass --show-details
+  // to opt in explicitly, or just run this locally where it's always safe.
+  const isCI = process.env.GITHUB_ACTIONS === "true";
+  const showDetails = process.argv.includes("--show-details") || !isCI;
+
   let allOperations = [];
+  let previewRecords = [];
   let attendeeCount = 0;
 
   for (const eventId of eventIds) {
@@ -95,6 +106,18 @@ async function main() {
         const mergeFields = buildMergeFields(attendee, config.mergeFieldMap || []);
         const tags = buildTags(attendee, config.tagRules || [], eventName);
 
+        if (dryRun) {
+          previewRecords.push({
+            event: eventName || eventId,
+            email: attendee.email,
+            firstName: attendee.firstName,
+            lastName: attendee.lastName,
+            mergeFields,
+            tags,
+          });
+          continue;
+        }
+
         const ops = buildUpsertOperations({
           listId: MAILCHIMP_LIST_ID,
           email: attendee.email,
@@ -106,14 +129,65 @@ async function main() {
       }
     }
 
-    // Only advance the checkpoint on a real (non-full) run, and only if we
-    // actually saw something newer, so a full backfill run doesn't skip
-    // future incremental runs.
-    if (!fullSync) {
+    // Only advance the checkpoint on a real (non-dry-run, non-full) run, and
+    // only if we actually saw something newer, so a full backfill run
+    // doesn't skip future incremental runs, and a dry run never advances
+    // the checkpoint at all.
+    if (!fullSync && !dryRun) {
       state.lastSyncByEvent[eventId] = new Date(
         Math.max(newestSeen, cutoff)
       ).toISOString();
     }
+  }
+
+  if (dryRun) {
+    console.log(`\n=== DRY RUN — nothing was sent to Mailchimp, state.json was not updated ===`);
+    console.log(`${attendeeCount} attendee(s) would be synced.\n`);
+
+    const tagCounts = new Map();
+    const fieldCounts = new Map();
+    for (const rec of previewRecords) {
+      for (const tag of rec.tags) tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+      for (const key of Object.keys(rec.mergeFields)) {
+        if (rec.mergeFields[key]) fieldCounts.set(key, (fieldCounts.get(key) || 0) + 1);
+      }
+    }
+
+    console.log("Tags that would be applied:");
+    if (tagCounts.size === 0) console.log("  (none)");
+    for (const [tag, count] of [...tagCounts.entries()].sort((a, b) => b[1] - a[1])) {
+      console.log(`  ${tag}: ${count} attendee(s)`);
+    }
+
+    console.log("\nMerge fields that would be populated:");
+    if (fieldCounts.size === 0) console.log("  (none)");
+    for (const [field, count] of [...fieldCounts.entries()].sort((a, b) => b[1] - a[1])) {
+      console.log(`  ${field}: ${count} attendee(s)`);
+    }
+
+    if (showDetails) {
+      console.log("\nPer-attendee detail:");
+      for (const rec of previewRecords) {
+        console.log(
+          `  ${rec.email} (${rec.firstName} ${rec.lastName}) — ${rec.event}\n` +
+            `    merge fields: ${JSON.stringify(rec.mergeFields)}\n` +
+            `    tags: ${rec.tags.join(", ") || "(none)"}`
+        );
+      }
+    } else {
+      console.log(
+        "\nPer-attendee detail (emails, names, checkout answers) is hidden here because " +
+          "this ran in GitHub Actions, where logs may be publicly visible. Run " +
+          "`node src/sync.js --full --dry-run` locally to see full detail safely, or pass " +
+          "--show-details if you're confident this repo/log is private."
+      );
+    }
+
+    const previewPath = path.resolve("dry-run-preview.json");
+    fs.writeFileSync(previewPath, JSON.stringify(previewRecords, null, 2));
+    console.log(`\nFull preview written to ${previewPath}` + (isCI ? " (on the runner - not retrievable unless uploaded as an artifact)." : "."));
+    console.log("\nNothing was written to Mailchimp. Re-run without --dry-run when you're happy with this.");
+    return;
   }
 
   console.log(`\n${attendeeCount} attendee(s) to sync, ${allOperations.length} Mailchimp operation(s).`);

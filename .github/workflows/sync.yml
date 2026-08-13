@@ -16,6 +16,14 @@ on:
         description: "Wait for Mailchimp batch to finish and report results"
         type: boolean
         default: true
+      dryRun:
+        description: "Dry run - preview only, writes nothing to Mailchimp"
+        type: boolean
+        default: false
+      showDetails:
+        description: "Dry run only: show per-attendee emails/answers in the log (exposes personal data if this repo's Actions logs are public)"
+        type: boolean
+        default: false
 
 jobs:
   sync:
@@ -46,11 +54,15 @@ jobs:
           ARGS=""
           if [ "${{ github.event.inputs.full }}" = "true" ]; then ARGS="$ARGS --full"; fi
           if [ "${{ github.event.inputs.wait }}" != "false" ]; then ARGS="$ARGS --wait"; fi
+          if [ "${{ github.event.inputs.dryRun }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          if [ "${{ github.event.inputs.showDetails }}" = "true" ]; then ARGS="$ARGS --show-details"; fi
           node src/sync.js $ARGS
 
       # state.json tracks "last synced" per event so incremental runs don't
       # re-process old orders. Commit it back so the next scheduled run sees it.
+      # Skipped entirely on a dry run, since nothing should be marked as synced.
       - name: Commit updated state
+        if: github.event.inputs.dryRun != 'true'
         run: |
           git config user.name "sync-bot"
           git config user.email "sync-bot@users.noreply.github.com"
