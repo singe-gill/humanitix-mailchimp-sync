@@ -17,12 +17,21 @@
       "source": "question",
       "match": "This persons last name",
       "mergeTag": "LNAME"
-    },
-    {
-      "source": "question",
-      "match": "This persons email",
-      "mergeTag": "ADDRESS"
     }
   ],
-  "tagRules": []
+  "tagRules": [],
+  "emailRouting": [
+    {
+      "ticketType": "Camper",
+      "primary": {
+        "emailQuestion": "This persons email",
+        "firstNameQuestion": "This persons first name",
+        "lastNameQuestion": "This persons last name"
+      },
+      "secondary": {
+        "emailQuestion": "Account contact email (Parent/Carer)",
+        "fullNameQuestion": "Account contact name (Parent/Carer)"
+      }
+    }
+  ]
 }
