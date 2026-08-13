@@ -1,6 +1,12 @@
 {
-  "updatedAt": "2026-08-13T05:58:20.112Z",
-  "checkoutQuestions": [],
+  "updatedAt": "2026-08-13T06:04:32.407Z",
+  "checkoutQuestions": [
+    "Account contact email (Parent/Carer)",
+    "Account contact mobile (Parent/Carer)",
+    "Account contact name (Parent/Carer)",
+    "If anywhere, where do you attend church?",
+    "Terms & Conditions"
+  ],
   "mergeFields": [
     {
       "tag": "ADDRESS",
