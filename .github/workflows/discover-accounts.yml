@@ -1,0 +1,35 @@
+name: Refresh events & audiences
+
+# Triggered from the "Refresh events & audiences" button in the control panel
+# (docs/index.html). Runs server-side with the real API keys and writes
+# docs/accounts.json - the browser never sees the keys, only the resulting
+# list of event/audience names. Unlike sync.yml and discover-options.yml,
+# this only needs the Secrets, not HUMANITIX_EVENT_IDS/MAILCHIMP_LIST_ID,
+# so it works even before those are set.
+on:
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+
+      - name: Discover accounts
+        env:
+          HUMANITIX_API_KEY: ${{ secrets.HUMANITIX_API_KEY }}
+          MAILCHIMP_API_KEY: ${{ secrets.MAILCHIMP_API_KEY }}
+          MAILCHIMP_SERVER_PREFIX: ${{ secrets.MAILCHIMP_SERVER_PREFIX }}
+        run: node src/discover-accounts.js
+
+      - name: Commit accounts.json
+        run: |
+          git config user.name "sync-bot"
+          git config user.email "sync-bot@users.noreply.github.com"
+          git add docs/accounts.json
+          git diff --cached --quiet || git commit -m "Refresh events & audiences [skip ci]"
+          git push

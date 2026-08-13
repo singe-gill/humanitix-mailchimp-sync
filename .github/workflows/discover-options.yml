@@ -1,0 +1,34 @@
+name: Refresh sync options
+
+# Triggered from the "Refresh options" button in the control panel (docs/index.html).
+# Runs server-side with the real API keys and writes docs/options.json - the
+# browser never sees the keys, only the resulting list of question/field/tag names.
+on:
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+
+      - name: Discover options
+        env:
+          HUMANITIX_API_KEY: ${{ secrets.HUMANITIX_API_KEY }}
+          HUMANITIX_EVENT_IDS: ${{ vars.HUMANITIX_EVENT_IDS }}
+          MAILCHIMP_API_KEY: ${{ secrets.MAILCHIMP_API_KEY }}
+          MAILCHIMP_SERVER_PREFIX: ${{ secrets.MAILCHIMP_SERVER_PREFIX }}
+          MAILCHIMP_LIST_ID: ${{ vars.MAILCHIMP_LIST_ID }}
+        run: node src/discover-options.js
+
+      - name: Commit options.json
+        run: |
+          git config user.name "sync-bot"
+          git config user.email "sync-bot@users.noreply.github.com"
+          git add docs/options.json
+          git diff --cached --quiet || git commit -m "Refresh sync options [skip ci]"
+          git push

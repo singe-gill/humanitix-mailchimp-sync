@@ -1,0 +1,59 @@
+name: Sync Humanitix attendees to Mailchimp
+
+on:
+  schedule:
+    # Every 10 minutes. GitHub's scheduler can lag a few minutes under load -
+    # tighten this (min 5 min) or move to a dedicated cron host (e.g. a
+    # Cloudflare Worker Cron Trigger) if you need tighter reliability.
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Full backfill (sync every attendee ever, not just new ones)"
+        type: boolean
+        default: false
+      wait:
+        description: "Wait for Mailchimp batch to finish and report results"
+        type: boolean
+        default: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: humanitix-mailchimp-sync
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install
+
+      - name: Run sync
+        env:
+          # Secrets: sensitive, write-only, set once in GitHub's own UI.
+          HUMANITIX_API_KEY: ${{ secrets.HUMANITIX_API_KEY }}
+          MAILCHIMP_API_KEY: ${{ secrets.MAILCHIMP_API_KEY }}
+          MAILCHIMP_SERVER_PREFIX: ${{ secrets.MAILCHIMP_SERVER_PREFIX }}
+          # Variables: not sensitive, readable/editable from docs/index.html (the control panel).
+          HUMANITIX_EVENT_IDS: ${{ vars.HUMANITIX_EVENT_IDS }}
+          MAILCHIMP_LIST_ID: ${{ vars.MAILCHIMP_LIST_ID }}
+          MAILCHIMP_STATUS_IF_NEW: ${{ vars.MAILCHIMP_STATUS_IF_NEW }}
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.full }}" = "true" ]; then ARGS="$ARGS --full"; fi
+          if [ "${{ github.event.inputs.wait }}" != "false" ]; then ARGS="$ARGS --wait"; fi
+          node src/sync.js $ARGS
+
+      # state.json tracks "last synced" per event so incremental runs don't
+      # re-process old orders. Commit it back so the next scheduled run sees it.
+      - name: Commit updated state
+        run: |
+          git config user.name "sync-bot"
+          git config user.email "sync-bot@users.noreply.github.com"
+          git add state.json || true
+          git diff --cached --quiet || git commit -m "Update sync state [skip ci]"
+          git push || true
