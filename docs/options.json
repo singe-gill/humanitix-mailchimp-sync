@@ -1,0 +1,35 @@
+{
+  "updatedAt": "2026-08-13T05:40:03.777Z",
+  "checkoutQuestions": [],
+  "mergeFields": [
+    {
+      "tag": "ADDRESS",
+      "name": "Address"
+    },
+    {
+      "tag": "FNAME",
+      "name": "First Name"
+    },
+    {
+      "tag": "LNAME",
+      "name": "Last Name"
+    },
+    {
+      "tag": "PHONE",
+      "name": "Phone Number"
+    }
+  ],
+  "tags": [
+    "CNF 2026 Camper",
+    "CNF 2026 Team Member",
+    "CNF 2027 Camper",
+    "CNF 2027 Team Member",
+    "Camp No Fear 2023",
+    "Camp No Fear 2024",
+    "Camp No Fear 2025",
+    "Church News Too",
+    "Last import",
+    "Launch 2024",
+    "The Youth Feed"
+  ]
+}

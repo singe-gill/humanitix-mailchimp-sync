@@ -1,0 +1,330 @@
+{
+  "updatedAt": "2026-08-13T05:37:33.374Z",
+  "events": [
+    {
+      "id": "6a5ec323df00fb34b131b8ab",
+      "name": "Voicebox Concert Showcase 2026"
+    },
+    {
+      "id": "6a3b28bca07a4bd89e1ca8e1",
+      "name": "Godzone Day Camp 2026"
+    },
+    {
+      "id": "6a39d3d52f2a8b77950ca0f9",
+      "name": "Baptism Testimony Recordings August 2026"
+    },
+    {
+      "id": "6a30c38fef0e4e664a5bf06f",
+      "name": "2026 Voicebox Concert - Performer Registration"
+    },
+    {
+      "id": "6a28c11a8c1e42b3a0a19336",
+      "name": "GTC - Sister Act Auditions"
+    },
+    {
+      "id": "6a06b729c3d51b1f18cfa3bf",
+      "name": "Broadway in a Week 2026 - Matilda Junior"
+    },
+    {
+      "id": "69cb015134f94d68feda33a6",
+      "name": "Matilda Jr Costume Fitting Day BIAW"
+    },
+    {
+      "id": "69bc90f42f8bde2a09c82fad",
+      "name": "State Youth Games 2026 - Gateway"
+    },
+    {
+      "id": "6993df5ad64738fd28741abc",
+      "name": "Facedown Camp 2026"
+    },
+    {
+      "id": "6993d760d87f19550435d94b",
+      "name": "Young Adults Retreat 2026"
+    },
+    {
+      "id": "6992a5ebf65fb03f6f7c3e6e",
+      "name": "Baptism Testimony Recordings April 2026"
+    },
+    {
+      "id": "698a937f39da848c58cee264",
+      "name": "Godzone Parents Night Out 2026"
+    },
+    {
+      "id": "6969d1f0988159926e249d5a",
+      "name": "Broadway in a Week Matilda Jr Auditions"
+    },
+    {
+      "id": "6969ce360c7fafa06ae6be27",
+      "name": "Broadway in a Week Mary Poppin Jr Auditions"
+    },
+    {
+      "id": "6969c167833890de63817058",
+      "name": "Broadway In A Week - Matilda Jr Auditions"
+    },
+    {
+      "id": "69687b49cc37eeb7831f7d4d",
+      "name": "Camp No Fear 2027: Undercover"
+    },
+    {
+      "id": "68eef4f6b60835cba4291eb5",
+      "name": "Joy To The World"
+    },
+    {
+      "id": "68e3508e1879498832b433c9",
+      "name": "Baptism Testimony Recordings November 2025"
+    },
+    {
+      "id": "68a312ce1bfc79ecd78c61ed",
+      "name": "Voicebox Concert Showcase"
+    },
+    {
+      "id": "6879e56bc09fe430283ba8e0",
+      "name": "Voicebox Concert Performer Registration"
+    },
+    {
+      "id": "6864770c3ea07f1331e24648",
+      "name": "Godzone Day Camp"
+    },
+    {
+      "id": "683948004f29797d3009e291",
+      "name": "Broadway in a Week 2025 - Mary Poppins Junior"
+    },
+    {
+      "id": "6835077e7deb6af9afa26fe0",
+      "name": "Mary Poppins BIAW Costume Fitting Day"
+    },
+    {
+      "id": "68181eb040a8ee37de39cc12",
+      "name": "Baptism Testimony Recordings June 2025"
+    },
+    {
+      "id": "681801def76f01e557ffe047",
+      "name": "GODZONE POTLUCK Lunch"
+    },
+    {
+      "id": "6808627f8e2839f3615332ea",
+      "name": "Gateway Youth - Peninsula Youth Alive Undivided"
+    },
+    {
+      "id": "67d3a8fbdee447ed8c1d96b8",
+      "name": "State Youth Games 2025 - Gateway"
+    },
+    {
+      "id": "67cf8b4a8b9b40afcd47d75e",
+      "name": "Baptism Testimony Recordings April 2025"
+    },
+    {
+      "id": "67c6458181c5269aafb19e1b",
+      "name": "BIAW Kids Seussical "
+    },
+    {
+      "id": "67bbacbe4acb25f686435eb5",
+      "name": "BIAW Kids Costume Fitting Day"
+    },
+    {
+      "id": "67a8441cba7ac57a1d0def7d",
+      "name": "Godzone Parents Night Out 2025"
+    },
+    {
+      "id": "67a5a06039c5d887e6c3758b",
+      "name": "Facedown Camp 2025"
+    },
+    {
+      "id": "67a1c2199ceb8efe3b853f0d",
+      "name": "Broadway In A Week - Mary Poppins Vocal Auditions"
+    },
+    {
+      "id": "67a1bfa29ceb8efe3b84d8a2",
+      "name": "Broadway In A Week - Mary Poppins Dance Auditions"
+    },
+    {
+      "id": "674d1e898fbf319f3f7584b7",
+      "name": "Broadway Kids - Singing and Dancing Auditions"
+    },
+    {
+      "id": "674cfe1b46f7228ba856b01e",
+      "name": "Broadway Kids - Solo Auditions"
+    },
+    {
+      "id": "673179c1bb9b5e8e1452cf51",
+      "name": "Calling All Angels"
+    },
+    {
+      "id": "6722f995972ae3ec7a8cc97f",
+      "name": "Peninsula Youths @ Gravity Zone"
+    },
+    {
+      "id": "66fa0487b1e4fbb1866ed1ef",
+      "name": "Baptism Testimony Recordings Nov 2024"
+    },
+    {
+      "id": "66bae5b1a888a8dd470cbd99",
+      "name": "The Gateway Theatre Company Presents - Footloose"
+    },
+    {
+      "id": "66a6e89f95f4285d6ab1b4ad",
+      "name": "Godzone Family Festival"
+    },
+    {
+      "id": "66a039ee5109a1ed9cacd0d3",
+      "name": "Voicebox Singing Concert Showcase"
+    },
+    {
+      "id": "666906b1cbfda3f46d43f9af",
+      "name": "Broadway in a Week 2024 - Drowsy Chaperone Jnr"
+    },
+    {
+      "id": "66503375e521e50410582d41",
+      "name": "Voicebox Concert - Performer Registration "
+    },
+    {
+      "id": "664adc3d31c21dfc80bc883e",
+      "name": "Godzone Sleepover 2024"
+    },
+    {
+      "id": "662ee5dec1ca0d5ce61ded78",
+      "name": "BIAW Costume Fitting Day"
+    },
+    {
+      "id": "6627517799cc041c67f94b06",
+      "name": "Baptism Testimony Recordings May 2024"
+    },
+    {
+      "id": "66274ca0ca99b48950ebf2af",
+      "name": "GTC - Footloose Dance Auditions"
+    },
+    {
+      "id": "6625fa08bb391ce402b9b68a",
+      "name": "GTC - Footloose Vocal and Acting Auditions"
+    },
+    {
+      "id": "661627ebfa623379dac3c40e",
+      "name": "State Youth Games 2024 - Gateway Youth"
+    },
+    {
+      "id": "660cacb02c6f05b170c6a5ca",
+      "name": "Mothers Day Fundraiser"
+    },
+    {
+      "id": "65e6b56dda8de2adaf8284a1",
+      "name": "Godzone Parents Night Out"
+    },
+    {
+      "id": "65e685dd2cb5877c843b08cc",
+      "name": "Gateway Theatre Company - 20th Anniversary Gala"
+    },
+    {
+      "id": "65dd690cc64f354aa853bccb",
+      "name": "Baptism Testimony Recordings March 2024"
+    },
+    {
+      "id": "65d82af799e5ceb06923ca9b",
+      "name": "Facedown Camp 2024"
+    },
+    {
+      "id": "65d55dd8640f714c8dd281d1",
+      "name": "Broadway In A Week - Drowsy Chaperone Dance Auditions"
+    },
+    {
+      "id": "65d54774cbedba1591211012",
+      "name": "Copy of Broadway in a Week Auditions "
+    },
+    {
+      "id": "65d546672e9e3141ed60ec9c",
+      "name": "Broadway In A Week - Drowsy Chaperone Vocal Auditions"
+    },
+    {
+      "id": "654db8eeef0be53decdf2c0e",
+      "name": "Hope Has Come"
+    },
+    {
+      "id": "654175979eb207a5ef6c9a70",
+      "name": "The Village Christmas Brunch"
+    },
+    {
+      "id": "64f6a20218eb62911421465f",
+      "name": "Boys Night Out"
+    },
+    {
+      "id": "64d0305f9dbd04acd81d83f2",
+      "name": "Baptism Testimony Recordings September 2023"
+    },
+    {
+      "id": "649123e02941f66f578b52cb",
+      "name": "Kids With Courage"
+    },
+    {
+      "id": "64645a593ded635c82af3019",
+      "name": "Godzone Sleepover"
+    },
+    {
+      "id": "6462e217a8b5fcbc94bae762",
+      "name": "Broadway In A Week Costume Fitting"
+    },
+    {
+      "id": "6440c009e3231fcd5c1c726a",
+      "name": "Baptism Testimony Recordings June 2023"
+    },
+    {
+      "id": "643de1d961e2a2803369b02a",
+      "name": "Broadway In A Week 2023: The Addams Family"
+    },
+    {
+      "id": "642a5fa20bd02515516c51cd",
+      "name": "Young Adults Retreat"
+    },
+    {
+      "id": "641a8a32f9e301182438ede6",
+      "name": "State Youth Games - Gateway Youth"
+    },
+    {
+      "id": "641a82f1f9e301182437c9d7",
+      "name": "Facedown Camp"
+    },
+    {
+      "id": "63ec1f0832b5c18028716cd9",
+      "name": "Broadway in a Week Dance Auditions"
+    },
+    {
+      "id": "63ec1ee54359b11e085a3ece",
+      "name": "Broadway in a Week Dance Auditions - Archived "
+    },
+    {
+      "id": "63ec1d274359b11e0859fabb",
+      "name": "Broadway in a Week Auditions "
+    },
+    {
+      "id": "63ec159632b5c18028704743",
+      "name": "Baptism Testimony Recordings "
+    },
+    {
+      "id": "63ec0fb85b6c9d97781b5f8c",
+      "name": "Baptism Testimony Recordings "
+    },
+    {
+      "id": "63daf97235e35da6f2840068",
+      "name": "Test Event"
+    },
+    {
+      "id": "6374707d154418e8e63626bb",
+      "name": "Test Event"
+    }
+  ],
+  "audiences": [
+    {
+      "id": "6fe0b015f6",
+      "name": "Gateway Church News",
+      "memberCount": 332
+    },
+    {
+      "id": "7371ad299d",
+      "name": "GCF Donor",
+      "memberCount": 277
+    },
+    {
+      "id": "b2be568fec",
+      "name": "Gateway Youth",
+      "memberCount": 652
+    }
+  ]
+}
