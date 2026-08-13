@@ -18,8 +18,21 @@ const {
   MAILCHIMP_LIST_ID,
 } = process.env;
 
+function stripNoisyFinancials(obj) {
+  if (Array.isArray(obj)) return obj.map(stripNoisyFinancials);
+  if (obj && typeof obj === "object") {
+    const out = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (/totals?v?2?$/i.test(key) || key === "purchaseTotals") continue;
+      out[key] = stripNoisyFinancials(value);
+    }
+    return out;
+  }
+  return obj;
+}
+
 function redactPII(obj) {
-  return JSON.stringify(obj, null, 2)
+  return JSON.stringify(stripNoisyFinancials(obj), null, 2)
     .replace(/"[^"]*@[^"]*"/g, '"[redacted-email]"')
     .replace(/"\+?[0-9][0-9\-\s().]{6,}"/g, '"[redacted-phone]"');
 }
@@ -63,9 +76,9 @@ async function main() {
     try {
       const tickets = await getAllTickets(HUMANITIX_API_KEY, eventId, { pageSize: 5 });
       if (tickets.length > 0) {
-        console.log("\n--- DIAGNOSTIC: tickets endpoint sample (emails/phones redacted) ---");
+        console.log("\n--- DIAGNOSTIC: tickets endpoint sample (emails/phones redacted, fee breakdowns stripped) ---");
         const dump = redactPII(tickets[0]);
-        console.log(dump.length > 4000 ? dump.slice(0, 4000) + "\n...[truncated]" : dump);
+        console.log(dump.length > 6000 ? dump.slice(0, 6000) + "\n...[truncated]" : dump);
         console.log("--- END DIAGNOSTIC ---\n");
       } else {
         console.log("  Tickets endpoint returned no results for this event.");
