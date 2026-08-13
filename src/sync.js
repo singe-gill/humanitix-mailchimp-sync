@@ -1,7 +1,7 @@
 import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
-import { getAllOrders, getEvent, buildQuestionLabelMap, extractAttendees } from "./humanitix.js";
+import { getAllOrders, getAllTickets, getEvent, buildQuestionLabelMap, groupTicketsByOrderId, extractAttendees } from "./humanitix.js";
 import { buildUpsertOperations, runBatch, waitForBatch } from "./mailchimp.js";
 import { buildMergeFields, buildTags } from "./mapping.js";
 
@@ -73,6 +73,10 @@ async function main() {
     const orders = await getAllOrders(HUMANITIX_API_KEY, eventId);
     console.log(`Found ${orders.length} total orders.`);
 
+    const tickets = await getAllTickets(HUMANITIX_API_KEY, eventId);
+    console.log(`Found ${tickets.length} total tickets.`);
+    const ticketsByOrderId = groupTicketsByOrderId(tickets);
+
     const cutoff = lastSync ? new Date(lastSync).getTime() : 0;
     let newestSeen = lastSync ? new Date(lastSync).getTime() : 0;
 
@@ -82,7 +86,8 @@ async function main() {
       if (createdMs && createdMs > newestSeen) newestSeen = createdMs;
       if (cutoff && createdMs && createdMs <= cutoff) continue; // already synced
 
-      const attendees = extractAttendees(order, questionLabelMap);
+      const ticketsForOrder = ticketsByOrderId.get(order._id || order.id) || [];
+      const attendees = extractAttendees(order, ticketsForOrder, questionLabelMap);
       for (const attendee of attendees) {
         if (!attendee.email) continue;
         attendeeCount += 1;

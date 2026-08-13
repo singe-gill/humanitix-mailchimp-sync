@@ -136,23 +136,24 @@ function extractQA(items, questionLabelMap) {
 }
 
 /**
- * Extract a flat list of "attendees" from a raw Humanitix order object.
- * Each attendee record carries: email, firstName, lastName, orderId,
- * createdAt, and a list of {question, answer} pairs gathered from every
- * place Humanitix might put checkout-question answers.
+ * Extract a flat list of "attendees" for one order, combining that order's
+ * own once-per-order answers with each linked ticket's per-attendee
+ * answers. Tickets live at a separate endpoint from orders (see
+ * getAllTickets) - pass in just the tickets belonging to this order
+ * (typically via ticket.orderId === order._id).
  *
  * questionLabelMap (from buildQuestionLabelMap) resolves questionId-only
  * answers to their actual question text.
  *
- * If the order has a tickets/attendees array, one attendee is produced per
- * ticket (combining order-level answers with that ticket's own answers).
- * Otherwise - which is what real accounts have been observed to return, at
- * least for order-level questions - the order's buyer becomes a single
- * attendee, using the order-level additionalFields as their answers.
+ * Each attendee's email is resolved in this order: an explicit ticket.email
+ * field if present, then a ticket-level answer whose question text mentions
+ * "email" (common when the checkout form collects each attendee's own email
+ * as a custom question rather than a dedicated field), then finally the
+ * order buyer's email as a last resort.
  */
-export function extractAttendees(order, questionLabelMap = {}) {
+export function extractAttendees(order, ticketsForOrder = [], questionLabelMap = {}) {
   const attendees = [];
-  const tickets = order.tickets || order.attendees || [];
+  const tickets = ticketsForOrder.length > 0 ? ticketsForOrder : (order.tickets || order.attendees || []);
 
   const orderLevelQA = [
     ...extractQA(order.additionalFields, questionLabelMap),
@@ -160,12 +161,13 @@ export function extractAttendees(order, questionLabelMap = {}) {
     ...extractQA(order.answers, questionLabelMap),
   ];
 
+  function findEmailInQA(qa) {
+    const hit = qa.find((x) => /e-?mail/i.test(x.question));
+    return hit && hit.answer ? String(hit.answer) : null;
+  }
+
   if (tickets.length > 0) {
     for (const ticket of tickets) {
-      const email =
-        ticket.email || ticket.attendeeEmail || order.email || order.buyerEmail;
-      if (!email) continue;
-
       const ticketQA = [
         ...extractQA(ticket.additionalFields, questionLabelMap),
         ...extractQA(ticket.customFieldAnswers, questionLabelMap),
@@ -173,17 +175,27 @@ export function extractAttendees(order, questionLabelMap = {}) {
         ...extractQA(ticket.fields, questionLabelMap),
       ];
 
+      const email =
+        ticket.email ||
+        ticket.attendeeEmail ||
+        findEmailInQA(ticketQA) ||
+        order.email ||
+        order.buyerEmail;
+      if (!email) continue;
+
       attendees.push({
         email: String(email).toLowerCase().trim(),
         firstName: ticket.firstName || ticket.attendeeFirstName || "",
         lastName: ticket.lastName || ticket.attendeeLastName || "",
         orderId: order._id || order.id,
+        ticketId: ticket._id || ticket.id,
         createdAt: order.createdAt || order.orderDate,
         answers: [...orderLevelQA, ...ticketQA],
       });
     }
   } else if (order.email) {
-    // No per-ticket breakdown available - sync the buyer as the attendee.
+    // No linked tickets found for this order - fall back to syncing the
+    // buyer using just the order-level answers.
     attendees.push({
       email: String(order.email).toLowerCase().trim(),
       firstName: order.firstName || "",
@@ -195,4 +207,16 @@ export function extractAttendees(order, questionLabelMap = {}) {
   }
 
   return attendees;
+}
+
+/** Group a flat ticket list by the order they belong to. */
+export function groupTicketsByOrderId(tickets) {
+  const map = new Map();
+  for (const ticket of tickets) {
+    const orderId = ticket.orderId || ticket.order_id;
+    if (!orderId) continue;
+    if (!map.has(orderId)) map.set(orderId, []);
+    map.get(orderId).push(ticket);
+  }
+  return map;
 }

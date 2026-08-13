@@ -1,13 +1,20 @@
 // Run via the "Refresh options" button in the control panel (or manually:
-// node src/discover-options.js). Scans recent orders for real checkout
-// question text, and asks Mailchimp what merge fields and tags already
-// exist, then writes docs/options.json so the control panel can offer
-// dropdowns instead of free-typed field names.
+// node src/discover-options.js). Scans recent orders + tickets for real
+// checkout question text, and asks Mailchimp what merge fields and tags
+// already exist, then writes docs/options.json so the control panel can
+// offer dropdowns instead of free-typed field names.
 
 import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
-import { getAllOrders, getAllTickets, getEvent, buildQuestionLabelMap, extractAttendees } from "./humanitix.js";
+import {
+  getAllOrders,
+  getAllTickets,
+  getEvent,
+  buildQuestionLabelMap,
+  groupTicketsByOrderId,
+  extractAttendees,
+} from "./humanitix.js";
 import { listMergeFields, listTags } from "./mailchimp.js";
 
 const {
@@ -17,25 +24,6 @@ const {
   MAILCHIMP_SERVER_PREFIX,
   MAILCHIMP_LIST_ID,
 } = process.env;
-
-function stripNoisyFinancials(obj) {
-  if (Array.isArray(obj)) return obj.map(stripNoisyFinancials);
-  if (obj && typeof obj === "object") {
-    const out = {};
-    for (const [key, value] of Object.entries(obj)) {
-      if (/totals?v?2?$/i.test(key) || key === "purchaseTotals") continue;
-      out[key] = stripNoisyFinancials(value);
-    }
-    return out;
-  }
-  return obj;
-}
-
-function redactPII(obj) {
-  return JSON.stringify(stripNoisyFinancials(obj), null, 2)
-    .replace(/"[^"]*@[^"]*"/g, '"[redacted-email]"')
-    .replace(/"\+?[0-9][0-9\-\s().]{6,}"/g, '"[redacted-phone]"');
-}
 
 async function main() {
   if (!HUMANITIX_API_KEY || !HUMANITIX_EVENT_IDS) {
@@ -49,56 +37,33 @@ async function main() {
 
   const eventIds = HUMANITIX_EVENT_IDS.split(",").map((s) => s.trim()).filter(Boolean);
   const questionSet = new Set();
-  let loggedSample = false;
 
   for (const eventId of eventIds) {
-    console.log(`Scanning orders for event ${eventId}...`);
+    console.log(`Scanning event ${eventId}...`);
     const event = await getEvent(HUMANITIX_API_KEY, eventId).catch(() => null);
     const questionLabelMap = event ? buildQuestionLabelMap(event) : {};
     console.log(`  Resolved ${Object.keys(questionLabelMap).length} question label(s) from event data.`);
 
     const orders = await getAllOrders(HUMANITIX_API_KEY, eventId);
-    console.log(`  ${orders.length} order(s) found.`);
+    const tickets = await getAllTickets(HUMANITIX_API_KEY, eventId);
+    console.log(`  ${orders.length} order(s), ${tickets.length} ticket(s).`);
+    const ticketsByOrderId = groupTicketsByOrderId(tickets);
+
     // Recent orders are enough to discover the question set - no need to
     // read every historical order for this. Cap it for speed.
     const sample = orders.slice(-200);
+    let attendeesSeen = 0;
     for (const order of sample) {
-      for (const attendee of extractAttendees(order, questionLabelMap)) {
+      const ticketsForOrder = ticketsByOrderId.get(order._id || order.id) || [];
+      const attendees = extractAttendees(order, ticketsForOrder, questionLabelMap);
+      attendeesSeen += attendees.length;
+      for (const attendee of attendees) {
         for (const qa of attendee.answers) {
           questionSet.add(qa.question);
         }
       }
     }
-
-    // Diagnostic: try the tickets endpoint too (unconfirmed against a live
-    // account) so we can see whether individual ticket-holder answers (e.g.
-    // per-attendee dietary requirements) live there separately from orders.
-    try {
-      const tickets = await getAllTickets(HUMANITIX_API_KEY, eventId, { pageSize: 5 });
-      if (tickets.length > 0) {
-        console.log("\n--- DIAGNOSTIC: tickets endpoint sample (emails/phones redacted, fee breakdowns stripped) ---");
-        const dump = redactPII(tickets[0]);
-        console.log(dump.length > 6000 ? dump.slice(0, 6000) + "\n...[truncated]" : dump);
-        console.log("--- END DIAGNOSTIC ---\n");
-      } else {
-        console.log("  Tickets endpoint returned no results for this event.");
-      }
-    } catch (err) {
-      console.log(`  Tickets endpoint not available: ${err.message}`);
-    }
-
-    // Diagnostic: if we found orders but still no questions after label
-    // resolution, dump the raw shape of one order (PII redacted) plus the
-    // event object so we can see where the checkout answers actually live.
-    if (!loggedSample && orders.length > 0 && questionSet.size === 0) {
-      loggedSample = true;
-      console.log("\n--- DIAGNOSTIC: still no checkout questions found. Raw order (emails/phones redacted) ---");
-      const dump = redactPII(orders[orders.length - 1]);
-      console.log(dump.length > 6000 ? dump.slice(0, 6000) + "\n...[truncated]" : dump);
-      console.log("--- Raw event object ---");
-      console.log(JSON.stringify(event, null, 2).slice(0, 4000));
-      console.log("--- END DIAGNOSTIC ---\n");
-    }
+    console.log(`  ${attendeesSeen} attendee(s) scanned, ${questionSet.size} unique question(s) found so far.`);
   }
 
   console.log("Fetching Mailchimp merge fields...");
