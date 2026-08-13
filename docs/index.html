@@ -651,7 +651,8 @@ function renderTagRules() {
     select.innerHTML = `
       <option value="static">Always tag every attendee</option>
       <option value="eventName">Tag with event name</option>
-      <option value="ticketType">Tag with ticket type</option>
+      <option value="ticketType">Tag with ticket type name</option>
+      <option value="ticketTypeEquals">Tag if ticket type equals…</option>
       <option value="questionAnswer">Tag with checkout answer</option>
       <option value="questionAnswerEquals">Tag only if answer equals…</option>
     `;
@@ -678,6 +679,9 @@ function renderTagRules() {
       body.appendChild(textField("Tag prefix, e.g. \"Event: \" (event name is appended automatically)", rule.prefix ?? "", (v) => rule.prefix = v));
     } else if (rule.type === "ticketType") {
       body.appendChild(textField("Tag prefix, e.g. \"Ticket type: \" (ticket type name is appended automatically)", rule.prefix ?? "", (v) => rule.prefix = v));
+    } else if (rule.type === "ticketTypeEquals") {
+      body.appendChild(textField("Ticket type, e.g. Team member", (rule.valueEquals || [])[0] || "", (v) => rule.valueEquals = [v], "ticketTypeOptions"));
+      body.appendChild(textField("Tag to apply, e.g. Staff", rule.tag || "", (v) => rule.tag = v, "tagOptions"));
     } else if (rule.type === "questionAnswer") {
       body.appendChild(textField("Checkout question text, e.g. Dietary requirements", rule.match || "", (v) => rule.match = v, "questionOptions"));
       body.appendChild(textField("Tag prefix, e.g. \"Diet: \" (answer is appended automatically)", rule.prefix ?? "", (v) => rule.prefix = v));
