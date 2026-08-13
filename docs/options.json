@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-13T06:18:40.543Z",
+  "updatedAt": "2026-08-13T07:00:51.611Z",
   "checkoutQuestions": [
     "Account contact email (Parent/Carer)",
     "Account contact mobile (Parent/Carer)",
@@ -43,6 +43,10 @@
     "This persons year level in 2027 (this information is used to help with cabin assignments)",
     "What role is this person most interested in at camp?",
     "Who invited you?"
+  ],
+  "ticketTypes": [
+    "Camper",
+    "Team Member"
   ],
   "mergeFields": [
     {
