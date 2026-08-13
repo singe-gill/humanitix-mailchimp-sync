@@ -7,7 +7,7 @@
 import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
-import { getAllOrders, extractAttendees } from "./humanitix.js";
+import { getAllOrders, getAllTickets, getEvent, buildQuestionLabelMap, extractAttendees } from "./humanitix.js";
 import { listMergeFields, listTags } from "./mailchimp.js";
 
 const {
@@ -40,27 +40,50 @@ async function main() {
 
   for (const eventId of eventIds) {
     console.log(`Scanning orders for event ${eventId}...`);
+    const event = await getEvent(HUMANITIX_API_KEY, eventId).catch(() => null);
+    const questionLabelMap = event ? buildQuestionLabelMap(event) : {};
+    console.log(`  Resolved ${Object.keys(questionLabelMap).length} question label(s) from event data.`);
+
     const orders = await getAllOrders(HUMANITIX_API_KEY, eventId);
     console.log(`  ${orders.length} order(s) found.`);
     // Recent orders are enough to discover the question set - no need to
     // read every historical order for this. Cap it for speed.
     const sample = orders.slice(-200);
     for (const order of sample) {
-      for (const attendee of extractAttendees(order)) {
+      for (const attendee of extractAttendees(order, questionLabelMap)) {
         for (const qa of attendee.answers) {
           questionSet.add(qa.question);
         }
       }
     }
 
-    // Diagnostic: if we found orders but no questions were extracted from
-    // any of them, dump the raw shape of one order (PII redacted) so we can
-    // see where the checkout answers actually live and fix extractAttendees().
+    // Diagnostic: try the tickets endpoint too (unconfirmed against a live
+    // account) so we can see whether individual ticket-holder answers (e.g.
+    // per-attendee dietary requirements) live there separately from orders.
+    try {
+      const tickets = await getAllTickets(HUMANITIX_API_KEY, eventId, { pageSize: 5 });
+      if (tickets.length > 0) {
+        console.log("\n--- DIAGNOSTIC: tickets endpoint sample (emails/phones redacted) ---");
+        const dump = redactPII(tickets[0]);
+        console.log(dump.length > 4000 ? dump.slice(0, 4000) + "\n...[truncated]" : dump);
+        console.log("--- END DIAGNOSTIC ---\n");
+      } else {
+        console.log("  Tickets endpoint returned no results for this event.");
+      }
+    } catch (err) {
+      console.log(`  Tickets endpoint not available: ${err.message}`);
+    }
+
+    // Diagnostic: if we found orders but still no questions after label
+    // resolution, dump the raw shape of one order (PII redacted) plus the
+    // event object so we can see where the checkout answers actually live.
     if (!loggedSample && orders.length > 0 && questionSet.size === 0) {
       loggedSample = true;
-      console.log("\n--- DIAGNOSTIC: no checkout questions found. Raw shape of one order (emails/phones redacted) ---");
+      console.log("\n--- DIAGNOSTIC: still no checkout questions found. Raw order (emails/phones redacted) ---");
       const dump = redactPII(orders[orders.length - 1]);
       console.log(dump.length > 6000 ? dump.slice(0, 6000) + "\n...[truncated]" : dump);
+      console.log("--- Raw event object ---");
+      console.log(JSON.stringify(event, null, 2).slice(0, 4000));
       console.log("--- END DIAGNOSTIC ---\n");
     }
   }

@@ -1,7 +1,7 @@
 import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
-import { getAllOrders, getEvent, extractAttendees } from "./humanitix.js";
+import { getAllOrders, getEvent, buildQuestionLabelMap, extractAttendees } from "./humanitix.js";
 import { buildUpsertOperations, runBatch, waitForBatch } from "./mailchimp.js";
 import { buildMergeFields, buildTags } from "./mapping.js";
 
@@ -61,6 +61,7 @@ async function main() {
     console.log(`\nFetching event ${eventId}...`);
     const event = await getEvent(HUMANITIX_API_KEY, eventId).catch(() => null);
     const eventName = event?.name || event?.eventName || undefined;
+    const questionLabelMap = event ? buildQuestionLabelMap(event) : {};
 
     const lastSync = fullSync ? null : state.lastSyncByEvent[eventId];
     console.log(
@@ -81,7 +82,7 @@ async function main() {
       if (createdMs && createdMs > newestSeen) newestSeen = createdMs;
       if (cutoff && createdMs && createdMs <= cutoff) continue; // already synced
 
-      const attendees = extractAttendees(order);
+      const attendees = extractAttendees(order, questionLabelMap);
       for (const attendee of attendees) {
         if (!attendee.email) continue;
         attendeeCount += 1;
