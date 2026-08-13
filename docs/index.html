@@ -255,6 +255,19 @@
     </div>
 
     <div class="card">
+      <h2>Email routing by ticket type</h2>
+      <p class="hint" style="margin-top:0">
+        By default, each ticket becomes one contact using its own email/name answers.
+        Add a rule here to override that for a specific ticket type — e.g. always use
+        one particular question as the email, or also sync a second contact
+        (like a parent/carer) when their email differs from the attendee's own.
+        Ticket types without a rule keep the default behavior.
+      </p>
+      <div id="emailRoutingTable"></div>
+      <div class="add-row"><button class="ghost small" id="addEmailRoutingBtn">+ Add ticket type rule</button></div>
+    </div>
+
+    <div class="card">
       <div class="toolbar">
         <button class="primary" id="saveMappingBtn">Save mapping</button>
         <span class="hint" style="margin-top:0">Saved as <code>config.json</code> in the repo. Create matching merge fields in Mailchimp's audience settings first, or values will be dropped.</span>
@@ -287,6 +300,7 @@
   <datalist id="questionOptions"></datalist>
   <datalist id="mergeFieldOptions"></datalist>
   <datalist id="tagOptions"></datalist>
+  <datalist id="ticketTypeOptions"></datalist>
 
 </div>
 
@@ -296,6 +310,7 @@ const GH = "https://api.github.com";
 let conn = null; // { owner, repo, token }
 let mergeFieldMap = [];
 let tagRules = [];
+let emailRouting = [];
 let configSha = null;
 
 function ghHeaders() {
@@ -545,8 +560,8 @@ async function loadConfig() {
   try {
     const res = await fetch(`${GH}/repos/${conn.owner}/${conn.repo}/contents/config.json`, { headers: ghHeaders() });
     if (res.status === 404) {
-      mergeFieldMap = []; tagRules = []; configSha = null;
-      renderMergeFields(); renderTagRules();
+      mergeFieldMap = []; tagRules = []; emailRouting = []; configSha = null;
+      renderMergeFields(); renderTagRules(); renderEmailRouting();
       return;
     }
     if (!res.ok) throw new Error(`Failed to load config.json (${res.status})`);
@@ -555,8 +570,10 @@ async function loadConfig() {
     const parsed = JSON.parse(decodeURIComponent(escape(atob(data.content))));
     mergeFieldMap = (parsed.mergeFieldMap || []).filter((r) => r.source === "question");
     tagRules = parsed.tagRules || [];
+    emailRouting = parsed.emailRouting || [];
     renderMergeFields();
     renderTagRules();
+    renderEmailRouting();
   } catch (err) {
     setStatus($("mappingStatus"), "err", err.message);
   }
@@ -570,7 +587,7 @@ async function saveConfig() {
       { source: "lastName", mergeTag: "LNAME" },
       ...mergeFieldMap,
     ];
-    const configObj = { mergeFieldMap: fullMergeMap, tagRules };
+    const configObj = { mergeFieldMap: fullMergeMap, tagRules, emailRouting };
     const content = btoa(unescape(encodeURIComponent(JSON.stringify(configObj, null, 2))));
     const res = await fetch(`${GH}/repos/${conn.owner}/${conn.repo}/contents/config.json`, {
       method: "PUT",
@@ -634,6 +651,7 @@ function renderTagRules() {
     select.innerHTML = `
       <option value="static">Always tag every attendee</option>
       <option value="eventName">Tag with event name</option>
+      <option value="ticketType">Tag with ticket type</option>
       <option value="questionAnswer">Tag with checkout answer</option>
       <option value="questionAnswerEquals">Tag only if answer equals…</option>
     `;
@@ -658,6 +676,8 @@ function renderTagRules() {
       body.appendChild(textField("Tag name, e.g. Humanitix Attendee", rule.tag || "", (v) => rule.tag = v, "tagOptions"));
     } else if (rule.type === "eventName") {
       body.appendChild(textField("Tag prefix, e.g. \"Event: \" (event name is appended automatically)", rule.prefix ?? "", (v) => rule.prefix = v));
+    } else if (rule.type === "ticketType") {
+      body.appendChild(textField("Tag prefix, e.g. \"Ticket type: \" (ticket type name is appended automatically)", rule.prefix ?? "", (v) => rule.prefix = v));
     } else if (rule.type === "questionAnswer") {
       body.appendChild(textField("Checkout question text, e.g. Dietary requirements", rule.match || "", (v) => rule.match = v, "questionOptions"));
       body.appendChild(textField("Tag prefix, e.g. \"Diet: \" (answer is appended automatically)", rule.prefix ?? "", (v) => rule.prefix = v));
@@ -666,6 +686,79 @@ function renderTagRules() {
       body.appendChild(textField("Match answers (comma-separated), e.g. Yes, yes", (rule.valueEquals || []).join(", "), (v) => rule.valueEquals = v.split(",").map(s => s.trim()).filter(Boolean)));
       body.appendChild(textField("Tag to apply, e.g. Newsletter Opt-in", rule.tag || "", (v) => rule.tag = v, "tagOptions"));
     }
+    block.appendChild(body);
+    container.appendChild(block);
+  });
+}
+
+function renderEmailRouting() {
+  const container = $("emailRoutingTable");
+  container.innerHTML = "";
+  if (emailRouting.length === 0) {
+    container.innerHTML = `<div class="empty-note">No overrides yet — every ticket type uses the default single-contact behavior.</div>`;
+  }
+  emailRouting.forEach((rule, i) => {
+    rule.primary = rule.primary || {};
+    const block = document.createElement("div");
+    block.className = "tag-rule-block";
+
+    const head = document.createElement("div");
+    head.className = "tag-rule-head";
+    const ticketTypeInput = document.createElement("input");
+    ticketTypeInput.type = "text";
+    ticketTypeInput.placeholder = "Ticket type, e.g. Camper";
+    ticketTypeInput.value = rule.ticketType || "";
+    ticketTypeInput.setAttribute("list", "ticketTypeOptions");
+    ticketTypeInput.style.flex = "0 0 220px";
+    ticketTypeInput.addEventListener("input", () => rule.ticketType = ticketTypeInput.value);
+    const spacer = document.createElement("div");
+    spacer.className = "spacer";
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "danger-ghost small";
+    removeBtn.textContent = "✕";
+    removeBtn.addEventListener("click", () => { emailRouting.splice(i, 1); renderEmailRouting(); });
+    head.appendChild(ticketTypeInput); head.appendChild(spacer); head.appendChild(removeBtn);
+    block.appendChild(head);
+
+    const body = document.createElement("div");
+    body.className = "rule-table";
+    body.innerHTML = `<div class="hint" style="margin:0 0 4px">This contact (required)</div>`;
+    body.appendChild(textField("Email question, e.g. This persons email", rule.primary.emailQuestion || "", (v) => rule.primary.emailQuestion = v, "questionOptions"));
+    body.appendChild(textField("First name question, e.g. This persons first name", rule.primary.firstNameQuestion || "", (v) => rule.primary.firstNameQuestion = v, "questionOptions"));
+    body.appendChild(textField("Last name question, e.g. This persons last name", rule.primary.lastNameQuestion || "", (v) => rule.primary.lastNameQuestion = v, "questionOptions"));
+
+    const secondaryToggleWrap = document.createElement("label");
+    secondaryToggleWrap.className = "checkbox-line";
+    secondaryToggleWrap.style.margin = "10px 0 4px";
+    const secondaryToggle = document.createElement("input");
+    secondaryToggle.type = "checkbox";
+    secondaryToggle.checked = !!rule.secondary;
+    secondaryToggleWrap.appendChild(secondaryToggle);
+    secondaryToggleWrap.appendChild(document.createTextNode("Also sync a second contact (e.g. parent/carer) when their email differs"));
+    body.appendChild(secondaryToggleWrap);
+
+    const secondaryFields = document.createElement("div");
+    secondaryFields.className = "rule-table";
+    secondaryFields.style.display = rule.secondary ? "" : "none";
+    function renderSecondaryFields() {
+      secondaryFields.innerHTML = "";
+      rule.secondary = rule.secondary || {};
+      secondaryFields.appendChild(textField("Their email question, e.g. Account contact email (Parent/Carer)", rule.secondary.emailQuestion || "", (v) => rule.secondary.emailQuestion = v, "questionOptions"));
+      secondaryFields.appendChild(textField("Their full name question (split on first space), e.g. Account contact name (Parent/Carer)", rule.secondary.fullNameQuestion || "", (v) => rule.secondary.fullNameQuestion = v, "questionOptions"));
+    }
+    renderSecondaryFields();
+    secondaryToggle.addEventListener("change", () => {
+      if (secondaryToggle.checked) {
+        rule.secondary = rule.secondary || { emailQuestion: "", fullNameQuestion: "" };
+        renderSecondaryFields();
+        secondaryFields.style.display = "";
+      } else {
+        delete rule.secondary;
+        secondaryFields.style.display = "none";
+      }
+    });
+    body.appendChild(secondaryFields);
+
     block.appendChild(body);
     container.appendChild(block);
   });
@@ -706,8 +799,10 @@ async function loadOptions() {
       .map((f) => `<option value="${escapeAttr(f.tag)}">${escapeAttr(f.name)}</option>`).join("");
     $("tagOptions").innerHTML = (parsed.tags || [])
       .map((t) => `<option value="${escapeAttr(t)}">`).join("");
+    $("ticketTypeOptions").innerHTML = (parsed.ticketTypes || [])
+      .map((t) => `<option value="${escapeAttr(t)}">`).join("");
 
-    $("optionsUpdated").textContent = `Last refreshed ${new Date(parsed.updatedAt).toLocaleString()} — ${parsed.checkoutQuestions.length} question(s), ${parsed.mergeFields.length} merge field(s), ${parsed.tags.length} tag(s).`;
+    $("optionsUpdated").textContent = `Last refreshed ${new Date(parsed.updatedAt).toLocaleString()} — ${parsed.checkoutQuestions.length} question(s), ${(parsed.ticketTypes || []).length} ticket type(s), ${parsed.mergeFields.length} merge field(s), ${parsed.tags.length} tag(s).`;
   } catch (err) {
     $("optionsUpdated").textContent = "Couldn't load options.";
     setStatus($("optionsStatus"), "err", err.message);
@@ -823,6 +918,7 @@ $("runNowBtn").addEventListener("click", () => runNow(false));
 $("dryRunBtn").addEventListener("click", () => runNow(true));
 $("addMergeFieldBtn").addEventListener("click", () => { mergeFieldMap.push({ source: "question", match: "", mergeTag: "" }); renderMergeFields(); });
 $("addTagRuleBtn").addEventListener("click", () => { tagRules.push({ type: "static", tag: "" }); renderTagRules(); });
+$("addEmailRoutingBtn").addEventListener("click", () => { emailRouting.push({ ticketType: "", primary: { emailQuestion: "", firstNameQuestion: "", lastNameQuestion: "" } }); renderEmailRouting(); });
 $("refreshOptionsBtn").addEventListener("click", refreshOptions);
 $("refreshAccountsBtn").addEventListener("click", refreshAccounts);
 

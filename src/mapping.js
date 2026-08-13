@@ -29,6 +29,8 @@ export function buildTags(attendee, tagRules, eventName) {
       tags.add(rule.tag);
     } else if (rule.type === "eventName" && eventName) {
       tags.add(`${rule.prefix || ""}${eventName}`);
+    } else if (rule.type === "ticketType" && attendee.ticketTypeName) {
+      tags.add(`${rule.prefix || ""}${attendee.ticketTypeName}`);
     } else if (rule.type === "questionAnswer") {
       const answer = findAnswer(attendee, rule.match);
       if (answer !== undefined && answer !== null && answer !== "") {

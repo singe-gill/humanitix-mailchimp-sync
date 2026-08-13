@@ -98,7 +98,7 @@ async function main() {
       if (cutoff && createdMs && createdMs <= cutoff) continue; // already synced
 
       const ticketsForOrder = ticketsByOrderId.get(order._id || order.id) || [];
-      const attendees = extractAttendees(order, ticketsForOrder, questionLabelMap);
+      const attendees = extractAttendees(order, ticketsForOrder, questionLabelMap, config.emailRouting || []);
       for (const attendee of attendees) {
         if (!attendee.email) continue;
         attendeeCount += 1;

@@ -135,23 +135,120 @@ function extractQA(items, questionLabelMap) {
   return qa;
 }
 
+function findQA(qaList, questionText) {
+  if (!questionText) return undefined;
+  const target = questionText.trim().toLowerCase();
+  const hit = qaList.find((x) => x.question.trim().toLowerCase() === target);
+  return hit ? hit.answer : undefined;
+}
+
+function splitFullName(fullName) {
+  const trimmed = String(fullName || "").trim();
+  const spaceIndex = trimmed.indexOf(" ");
+  if (spaceIndex === -1) return { firstName: trimmed, lastName: "" };
+  return { firstName: trimmed.slice(0, spaceIndex), lastName: trimmed.slice(spaceIndex + 1).trim() };
+}
+
+function makeContact({ email, firstName, lastName, orderId, ticketId, createdAt, answers, ticketTypeName }) {
+  return {
+    email: String(email).toLowerCase().trim(),
+    firstName: firstName || "",
+    lastName: lastName || "",
+    orderId,
+    ticketId,
+    createdAt,
+    answers,
+    ticketTypeName: ticketTypeName || "",
+  };
+}
+
 /**
- * Extract a flat list of "attendees" for one order, combining that order's
- * own once-per-order answers with each linked ticket's per-attendee
- * answers. Tickets live at a separate endpoint from orders (see
- * getAllTickets) - pass in just the tickets belonging to this order
- * (typically via ticket.orderId === order._id).
+ * Build the contact(s) for one ticket, given emailRouting rules from
+ * config.json. A rule matches by ticket.ticketTypeName (case-insensitive,
+ * exact match). Rules can produce either one contact ("primary" only) or
+ * two ("primary" + "secondary", e.g. attendee + parent/guardian) - the
+ * secondary is only included if its resolved email differs from the
+ * primary's. Tickets whose type doesn't match any rule fall back to
+ * the pre-existing single-contact, auto-detected-email behaviour.
+ */
+function resolveTicketContacts(ticket, allQA, order, emailRoutingRules) {
+  const ticketTypeName = ticket.ticketTypeName || ticket.ticketType || "";
+  const rule = (emailRoutingRules || []).find(
+    (r) => r.ticketType && r.ticketType.trim().toLowerCase() === ticketTypeName.trim().toLowerCase()
+  );
+
+  const shared = {
+    orderId: order._id || order.id,
+    ticketId: ticket._id || ticket.id,
+    createdAt: order.createdAt || order.orderDate,
+    answers: allQA,
+    ticketTypeName,
+  };
+
+  if (!rule) {
+    // Default behaviour: ticket.email if present, else a ticket-level
+    // answer whose question text mentions "email", else the order buyer's.
+    const emailHit = allQA.find((x) => /e-?mail/i.test(x.question));
+    const email =
+      ticket.email || ticket.attendeeEmail || (emailHit && emailHit.answer) || order.email || order.buyerEmail;
+    if (!email) return [];
+    return [
+      makeContact({
+        ...shared,
+        email,
+        firstName: ticket.firstName || ticket.attendeeFirstName || "",
+        lastName: ticket.lastName || ticket.attendeeLastName || "",
+      }),
+    ];
+  }
+
+  const contacts = [];
+
+  const primaryEmail = findQA(allQA, rule.primary?.emailQuestion) || ticket.email;
+  if (primaryEmail) {
+    contacts.push(
+      makeContact({
+        ...shared,
+        email: primaryEmail,
+        firstName: findQA(allQA, rule.primary?.firstNameQuestion) || ticket.firstName || "",
+        lastName: findQA(allQA, rule.primary?.lastNameQuestion) || ticket.lastName || "",
+      })
+    );
+  }
+
+  if (rule.secondary?.emailQuestion) {
+    const secondaryEmail = findQA(allQA, rule.secondary.emailQuestion);
+    const isDifferent =
+      secondaryEmail &&
+      (!primaryEmail || String(secondaryEmail).trim().toLowerCase() !== String(primaryEmail).trim().toLowerCase());
+    if (isDifferent) {
+      const fullName = findQA(allQA, rule.secondary.fullNameQuestion);
+      const { firstName, lastName } = splitFullName(fullName);
+      contacts.push(makeContact({ ...shared, email: secondaryEmail, firstName, lastName }));
+    }
+  }
+
+  return contacts;
+}
+
+/**
+ * Extract a flat list of "attendees" (Mailchimp contacts to sync) for one
+ * order, combining that order's own once-per-order answers with each
+ * linked ticket's per-attendee answers. Tickets live at a separate endpoint
+ * from orders (see getAllTickets) - pass in just the tickets belonging to
+ * this order (typically via ticket.orderId === order._id).
  *
  * questionLabelMap (from buildQuestionLabelMap) resolves questionId-only
  * answers to their actual question text.
  *
- * Each attendee's email is resolved in this order: an explicit ticket.email
- * field if present, then a ticket-level answer whose question text mentions
- * "email" (common when the checkout form collects each attendee's own email
- * as a custom question rather than a dedicated field), then finally the
- * order buyer's email as a last resort.
+ * emailRoutingRules (config.json's "emailRouting", optional) lets you
+ * override, per ticket type, which question holds the email/name and
+ * whether a second contact (e.g. a parent/guardian) should also be synced
+ * when their email differs from the attendee's own. Ticket types not
+ * covered by a rule use the default single-contact, auto-detected-email
+ * behaviour.
  */
-export function extractAttendees(order, ticketsForOrder = [], questionLabelMap = {}) {
+export function extractAttendees(order, ticketsForOrder = [], questionLabelMap = {}, emailRoutingRules = []) {
   const attendees = [];
   const tickets = ticketsForOrder.length > 0 ? ticketsForOrder : (order.tickets || order.attendees || []);
 
@@ -161,11 +258,6 @@ export function extractAttendees(order, ticketsForOrder = [], questionLabelMap =
     ...extractQA(order.answers, questionLabelMap),
   ];
 
-  function findEmailInQA(qa) {
-    const hit = qa.find((x) => /e-?mail/i.test(x.question));
-    return hit && hit.answer ? String(hit.answer) : null;
-  }
-
   if (tickets.length > 0) {
     for (const ticket of tickets) {
       const ticketQA = [
@@ -174,36 +266,22 @@ export function extractAttendees(order, ticketsForOrder = [], questionLabelMap =
         ...extractQA(ticket.answers, questionLabelMap),
         ...extractQA(ticket.fields, questionLabelMap),
       ];
-
-      const email =
-        ticket.email ||
-        ticket.attendeeEmail ||
-        findEmailInQA(ticketQA) ||
-        order.email ||
-        order.buyerEmail;
-      if (!email) continue;
-
-      attendees.push({
-        email: String(email).toLowerCase().trim(),
-        firstName: ticket.firstName || ticket.attendeeFirstName || "",
-        lastName: ticket.lastName || ticket.attendeeLastName || "",
-        orderId: order._id || order.id,
-        ticketId: ticket._id || ticket.id,
-        createdAt: order.createdAt || order.orderDate,
-        answers: [...orderLevelQA, ...ticketQA],
-      });
+      const allQA = [...orderLevelQA, ...ticketQA];
+      attendees.push(...resolveTicketContacts(ticket, allQA, order, emailRoutingRules));
     }
   } else if (order.email) {
     // No linked tickets found for this order - fall back to syncing the
     // buyer using just the order-level answers.
-    attendees.push({
-      email: String(order.email).toLowerCase().trim(),
-      firstName: order.firstName || "",
-      lastName: order.lastName || "",
-      orderId: order._id || order.id,
-      createdAt: order.createdAt || order.orderDate,
-      answers: orderLevelQA,
-    });
+    attendees.push(
+      makeContact({
+        email: order.email,
+        firstName: order.firstName || "",
+        lastName: order.lastName || "",
+        orderId: order._id || order.id,
+        createdAt: order.createdAt || order.orderDate,
+        answers: orderLevelQA,
+      })
+    );
   }
 
   return attendees;

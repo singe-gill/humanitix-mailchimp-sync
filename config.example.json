@@ -1,6 +1,31 @@
 {
   "_comment": "Copy this file to config.json and edit. Run `npm run discover` first to see your real checkout question labels, then match them exactly in 'match' below.",
 
+  "emailRouting": [
+    {
+      "_comment": "Team members: sync one contact, using their own email/name questions.",
+      "ticketType": "Team member",
+      "primary": {
+        "emailQuestion": "This persons email",
+        "firstNameQuestion": "This persons first name",
+        "lastNameQuestion": "This persons last name"
+      }
+    },
+    {
+      "_comment": "Campers: sync the camper as a contact, plus a second contact for the parent/carer ONLY if their email differs from the camper's.",
+      "ticketType": "Camper",
+      "primary": {
+        "emailQuestion": "This persons email",
+        "firstNameQuestion": "This persons first name",
+        "lastNameQuestion": "This persons last name"
+      },
+      "secondary": {
+        "emailQuestion": "Account contact email (Parent/Carer)",
+        "fullNameQuestion": "Account contact name (Parent/Carer)"
+      }
+    }
+  ],
+
   "mergeFieldMap": [
     {
       "_comment": "Every attendee gets these from their ticket record, not a checkout question",
@@ -34,6 +59,11 @@
       "_comment": "One tag per event, so you can email attendees of a specific event",
       "type": "eventName",
       "prefix": "Event: "
+    },
+    {
+      "_comment": "Tags by ticket type name, e.g. 'Ticket type: Camper' / 'Ticket type: Team member'",
+      "type": "ticketType",
+      "prefix": "Ticket type: "
     },
     {
       "_comment": "Tags based on a checkout question's answer. Answer text becomes part of the tag.",
