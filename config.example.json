@@ -1,0 +1,52 @@
+{
+  "_comment": "Copy this file to config.json and edit. Run `npm run discover` first to see your real checkout question labels, then match them exactly in 'match' below.",
+
+  "mergeFieldMap": [
+    {
+      "_comment": "Every attendee gets these from their ticket record, not a checkout question",
+      "source": "firstName",
+      "mergeTag": "FNAME"
+    },
+    {
+      "source": "lastName",
+      "mergeTag": "LNAME"
+    },
+    {
+      "_comment": "Maps a checkout question's answer straight into a Mailchimp merge field (create this merge field in Mailchimp first: Audience > Settings > Audience fields)",
+      "source": "question",
+      "match": "Company",
+      "mergeTag": "COMPANY"
+    },
+    {
+      "source": "question",
+      "match": "Job title",
+      "mergeTag": "JOBTITLE"
+    }
+  ],
+
+  "tagRules": [
+    {
+      "_comment": "Every synced attendee gets this tag, useful for building a segment of 'all event attendees'",
+      "type": "static",
+      "tag": "Humanitix Attendee"
+    },
+    {
+      "_comment": "One tag per event, so you can email attendees of a specific event",
+      "type": "eventName",
+      "prefix": "Event: "
+    },
+    {
+      "_comment": "Tags based on a checkout question's answer. Answer text becomes part of the tag.",
+      "type": "questionAnswer",
+      "match": "Dietary requirements",
+      "prefix": "Diet: "
+    },
+    {
+      "_comment": "Tag only applied when the answer matches one of the listed values (case-insensitive)",
+      "type": "questionAnswerEquals",
+      "match": "Would you like to join our newsletter?",
+      "valueEquals": ["Yes", "yes"],
+      "tag": "Newsletter Opt-in"
+    }
+  ]
+}

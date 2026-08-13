@@ -1,0 +1,17 @@
+{
+  "name": "humanitix-mailchimp-sync",
+  "version": "1.0.0",
+  "description": "Syncs Humanitix event attendees (including checkout question answers) into Mailchimp as contacts + tags.",
+  "type": "module",
+  "scripts": {
+    "discover": "node src/discover.js",
+    "sync": "node src/sync.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
