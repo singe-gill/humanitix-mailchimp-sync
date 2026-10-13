@@ -57,12 +57,12 @@ async function main() {
   // Dry run: compute everything, write nothing to Mailchimp, don't advance
   // the sync checkpoint (so a real run afterward still picks up everyone).
   const dryRun = process.argv.includes("--dry-run");
-  // Print full per-attendee detail (emails, names, checkout answers) to the
-  // console/log. Off by default when running in GitHub Actions, since a
-  // public repo's Actions logs are publicly visible - pass --show-details
-  // to opt in explicitly, or just run this locally where it's always safe.
+  // Print full per-attendee detail (emails, names, checkout answers) only
+  // when running locally. Never in GitHub Actions: this repo is public, so
+  // its Actions logs are visible to anyone, and there's deliberately no
+  // flag to override that.
   const isCI = process.env.GITHUB_ACTIONS === "true";
-  const showDetails = process.argv.includes("--show-details") || !isCI;
+  const showDetails = !isCI;
 
   let allOperations = [];
   let previewRecords = [];
@@ -189,9 +189,8 @@ async function main() {
     } else {
       console.log(
         "\nPer-attendee detail (emails, names, checkout answers) is hidden here because " +
-          "this ran in GitHub Actions, where logs may be publicly visible. Run " +
-          "`node src/sync.js --full --dry-run` locally to see full detail safely, or pass " +
-          "--show-details if you're confident this repo/log is private."
+          "this ran in GitHub Actions, where logs are publicly visible. Run " +
+          "`node src/sync.js --full --dry-run` locally to see full detail safely."
       );
     }
 
@@ -232,7 +231,14 @@ async function main() {
         `Batch finished: ${finished.completed_operations}/${finished.total_operations} ops, ${finished.errored_operations} error(s).`
       );
       if (finished.errored_operations > 0) {
-        console.log(`See error details at: ${finished.response_body_url}`);
+        // The report behind response_body_url can contain attendee emails,
+        // and the link works for anyone who has it (for ~10 minutes), so
+        // only print it locally - never into a public Actions log.
+        if (isCI) {
+          console.log(`Error details hidden in GitHub Actions (the report can contain attendee emails). Re-run locally with --wait to see them.`);
+        } else {
+          console.log(`See error details at: ${finished.response_body_url}`);
+        }
       }
     }
   }

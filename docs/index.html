@@ -296,11 +296,7 @@
         <button class="primary" id="runNowBtn">Sync now</button>
         <label class="checkbox-line"><input type="checkbox" id="fullBackfill" /> Full backfill (all attendees, not just new)</label>
       </div>
-      <label class="checkbox-line" style="margin-top:8px">
-        <input type="checkbox" id="showDetails" />
-        Show per-attendee emails/answers in the run log (only enable if you're sure this repo's Actions logs are private)
-      </label>
-      <p class="hint">Dry run computes everything but writes nothing to Mailchimp and doesn't advance the sync checkpoint — safe to run as many times as you like. Check the Actions log for tag/field counts, or enable the option above for full per-attendee detail.</p>
+      <p class="hint">Dry run computes everything but writes nothing to Mailchimp and doesn't advance the sync checkpoint — safe to run as many times as you like. Check the Actions log for tag/field counts. Per-attendee detail (emails, names) is never written to the log, because this repo's logs are public — run <code>npm run sync -- --dry-run</code> on your own computer to see it.</p>
       <div class="status-line" id="runStatus"></div>
     </div>
 
@@ -901,7 +897,6 @@ async function runNow(dryRun) {
           full: $("fullBackfill").checked ? "true" : "false",
           wait: "true",
           dryRun: dryRun ? "true" : "false",
-          showDetails: $("showDetails").checked ? "true" : "false",
         },
       }),
     });

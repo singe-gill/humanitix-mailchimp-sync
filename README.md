@@ -84,8 +84,9 @@ npm run sync -- --full --wait
 
 `--dry-run` computes everything and prints what *would* be sent, but writes
 nothing to Mailchimp and doesn't advance `state.json`. Locally it prints full
-per-attendee detail; in GitHub Actions it only prints counts unless you add
-`--show-details`, to keep personal data out of the Actions logs.
+per-attendee detail; in GitHub Actions it only ever prints counts, because
+this repo is public and so are its Actions logs. Mailchimp error-report links
+are likewise only printed locally.
 `--full` backfills every past attendee (first run only — otherwise it only
 looks at orders since the last run). `--wait` makes it wait for the
 Mailchimp batch to finish and print a pass/fail summary instead of just
@@ -99,7 +100,7 @@ look right before automating.
 The included `.github/workflows/sync.yml` runs the sync every 3 hours
 (`0 */3 * * *` — chosen to stay well inside GitHub Actions' free minutes, not
 because of API limits) and also exposes a manual "Run workflow" button (with
-full-backfill, dry-run and show-details options) in the GitHub Actions tab.
+full-backfill and dry-run options) in the GitHub Actions tab.
 Use that, or **Sync now** in the control panel, right before sending a
 campaign to guarantee the latest registrants are included.
 
