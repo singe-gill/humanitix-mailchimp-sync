@@ -4,7 +4,8 @@ Syncs Humanitix event attendees — including per-ticket checkout question answe
 
 ## Architecture
 
-- **Repo**: `singegill/humanitix-mailchimp-sync` on GitHub — **private**, and under the `singegill` account (no hyphen), not `singe-gill`. If `git`/`gh` says "Repository not found", the wrong account is active in `gh` (`gh auth switch`).
+- **Repo**: `singe-gill/humanitix-mailchimp-sync` on GitHub — **private**. Transferred from the `singegill` account (no hyphen) on 2026-10-13; Secrets, Variables and Actions settings came across intact. If `git`/`gh` says "Repository not found" or auth fails, the wrong account is active in `gh` (`gh auth switch -u singe-gill`). This checkout uses `gh` as its git credential helper (repo-local config), so git follows the active `gh` account.
+- **Control panel hosting**: `singe-gill` is on GitHub's free plan, which can't serve Pages from a private repo, so the old `*.github.io` URL no longer works. All of `docs/index.html`'s requests go to `api.github.com` (which allows any origin), so it can be opened directly from disk instead.
 
 - **Execution**: GitHub Actions, scheduled cron (currently every 3 hours) + manual `workflow_dispatch` trigger
 - **Control panel**: a single static page (`docs/index.html`), hosted via GitHub Pages, that talks directly to the GitHub REST API from the browser using a user-supplied fine-grained PAT. No backend server.
