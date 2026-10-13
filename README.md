@@ -7,10 +7,14 @@ and creates/updates them as tagged contacts in a Mailchimp audience.
 
 Humanitix doesn't offer webhooks, so this works by **polling**: each run
 fetches orders for your configured event(s) and only processes ones created
-since the last successful run (tracked in `state.json`). Running it on a
-schedule every 5–10 minutes gets you close to real-time. You can also trigger
-it manually at any time — e.g. right before sending a campaign — via the
-GitHub Actions "Run workflow" button, with no risk of double-processing.
+since the last successful run (tracked in `state.json`). It runs on a
+schedule every 3 hours, and you can also trigger it manually at any time —
+e.g. right before sending a campaign — via **Sync now** in the control panel
+or the GitHub Actions "Run workflow" button, with no risk of double-processing.
+
+Cancelled and refunded orders/tickets are skipped (see `excludeStatuses`
+below). Partially refunded tickets are still synced on purpose — a partial
+refund usually doesn't mean the person isn't coming.
 
 ## 1. Get your API keys
 
@@ -36,9 +40,11 @@ npm run discover
 ```
 
 Compare the output against the comments in `src/humanitix.js`
-(`extractAttendees` function). If your checkout answers live under a
-different field than what's listed there, let me know the shape and I'll
-adjust it, or edit `candidateArrays` in that file yourself.
+(`extractAttendees` function). Note that an order doesn't include its
+tickets — those come from a separate endpoint and are linked back by
+`ticket.orderId` — and checkout answers are `{questionId, value}` pairs whose
+question text is looked up from the event. If your account's data looks
+different, adjust the extraction logic in `src/humanitix.js`.
 
 ## 3. Configure the mapping
 
@@ -46,20 +52,40 @@ adjust it, or edit `candidateArrays` in that file yourself.
 cp config.example.json config.json
 ```
 
-Edit `config.json`:
+Edit `config.json` (or use the control panel, below — it edits the same file):
+- `emailRouting` — per ticket type: which checkout questions hold the
+  attendee's email/first name/last name, which tag to apply, and optionally
+  a `secondary` contact (e.g. a parent/carer) that's only created when their
+  email differs from the attendee's. Ticket types are matched by name,
+  case-insensitively. Ticket types with no rule get one contact per ticket,
+  with the email auto-detected from any question mentioning "email", and no tag.
 - `mergeFieldMap` — which checkout question answers become Mailchimp merge
   fields (name, company, job title, etc). **Create matching merge fields in
   Mailchimp first** (Audience → Settings → Audience fields) or the values
   will be silently dropped.
-- `tagRules` — which checkout answers become tags (dietary requirements,
-  newsletter opt-in, event name, etc).
+- `excludeStatuses` — order/ticket statuses to skip (case-insensitive,
+  checked against both `status` and `financialStatus`). Defaults to
+  `cancelled, canceled, refunded, void, voided`. Statuses seen on the live
+  account so far: `cancelled`, `complete`, `free`, `paid`,
+  `partiallyRefunded`, `refunded`.
+- `tagRules` — legacy general-purpose tag rules (by event name, ticket type,
+  or checkout answer). Still supported if you hand-edit `config.json`, but
+  no longer shown in the control panel; per-ticket-type tags in
+  `emailRouting` cover the usual case.
+
+See `config.example.json` for a worked example of each.
 
 ## 4. Test run
 
 ```bash
+npm run sync -- --full --dry-run
 npm run sync -- --full --wait
 ```
 
+`--dry-run` computes everything and prints what *would* be sent, but writes
+nothing to Mailchimp and doesn't advance `state.json`. Locally it prints full
+per-attendee detail; in GitHub Actions it only prints counts unless you add
+`--show-details`, to keep personal data out of the Actions logs.
 `--full` backfills every past attendee (first run only — otherwise it only
 looks at orders since the last run). `--wait` makes it wait for the
 Mailchimp batch to finish and print a pass/fail summary instead of just
@@ -70,10 +96,12 @@ look right before automating.
 
 ## 5. Automate it
 
-The included `.github/workflows/sync.yml` runs the sync every 10 minutes and
-also exposes a manual "Run workflow" button (with a "full backfill" checkbox)
-in the GitHub Actions tab — use that right before sending a campaign to
-guarantee the latest registrants are included.
+The included `.github/workflows/sync.yml` runs the sync every 3 hours
+(`0 */3 * * *` — chosen to stay well inside GitHub Actions' free minutes, not
+because of API limits) and also exposes a manual "Run workflow" button (with
+full-backfill, dry-run and show-details options) in the GitHub Actions tab.
+Use that, or **Sync now** in the control panel, right before sending a
+campaign to guarantee the latest registrants are included.
 
 To set it up:
 1. Push this folder to a GitHub repo.
@@ -125,10 +153,14 @@ From the control panel you can:
   its own small GitHub Actions job (`discover-accounts.yml`) that only needs
   your API keys (already set as Secrets), so it works even on a totally
   fresh setup before anything else is configured.
-- Build merge-field and tag mapping rules with plain forms instead of
-  hand-editing `config.json`
-- Trigger a sync immediately (with a full-backfill option) and watch its
-  status in Recent Runs, which links to the full GitHub Actions log
+- Build merge-field rules and per-ticket-type email routing/tag rules with
+  plain forms instead of hand-editing `config.json` (ticket types are
+  dropdowns; questions, merge fields and tags are free text with autocomplete)
+- Edit which statuses count as cancelled/refunded ("Skip cancelled/refunded
+  tickets")
+- Run a **Dry run** (preview only, writes nothing) or **Sync now** (with a
+  full-backfill option) and watch its status in Recent Runs, which links to
+  the full GitHub Actions log
 - Click **Refresh options** to scan your recent orders for real checkout
   question text and ask Mailchimp what merge fields/tags already exist, so
   the question/field/tag inputs above offer autocomplete suggestions instead
@@ -154,22 +186,24 @@ Only sync attendees to Mailchimp who've actually agreed to be emailed.
 marketable — only use that if your checkout flow already has a clear opt-in
 question. If it doesn't, use `pending` instead, which sends Mailchimp's
 standard double opt-in confirmation email, or add an explicit "join our
-newsletter" checkout question and gate tagging/subscription on that answer
-(see the `questionAnswerEquals` example in `config.example.json`).
+newsletter" checkout question and gate tagging on that answer with a
+legacy `tagRules` entry of type `questionAnswerEquals` (see `src/mapping.js`).
 
 ## Files
 
 | File | Purpose |
 |---|---|
-| `src/humanitix.js` | Humanitix API client + attendee extraction |
+| `src/humanitix.js` | Humanitix API client, attendee extraction, email routing, status filtering |
 | `src/mailchimp.js` | Mailchimp API client (upsert + tagging via batch) |
-| `src/mapping.js` | Turns `config.json` rules into merge fields/tags |
+| `src/mapping.js` | Builds merge fields; legacy `tagRules` engine |
 | `src/sync.js` | Orchestrates everything, tracks incremental state |
 | `src/discover.js` | One-off script to inspect real API response shape |
-| `config.json` | Your question → merge field / tag mapping (not committed by default in example) |
+| `config.json` | Your mapping rules (committed; no secrets). `config.example.json` is a worked example |
 | `state.json` | Auto-generated; tracks last synced timestamp per event |
 | `docs/index.html` | Browser control panel (GitHub Pages) for settings + manual runs |
 | `docs/options.json` | Auto-generated; discovered checkout questions / merge fields / tags for the control panel's autocomplete |
 | `docs/accounts.json` | Auto-generated; discovered Humanitix events / Mailchimp audiences for the control panel's pickers |
 | `src/discover-options.js` | Scans orders + Mailchimp to produce `docs/options.json` |
 | `src/discover-accounts.js` | Lists events + audiences to produce `docs/accounts.json` |
+| `.github/workflows/sync.yml` | Scheduled (3-hourly) + manual sync |
+| `.github/workflows/discover-options.yml`, `discover-accounts.yml` | Manual-only jobs behind the control panel's Refresh buttons |

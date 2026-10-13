@@ -37,7 +37,7 @@ for (const eventId of eventIds) {
 console.log(
   "\n--- Next step ---\n" +
     "Compare the JSON above to what src/humanitix.js's extractAttendees() " +
-    "function expects (see the comments in that file). If your checkout " +
-    "question answers live under a different key than it's checking for, " +
-    "tell me the shape and I'll adjust it — or edit candidateArrays yourself."
+    "function expects (see the comments in that file). If your " +
+    "data looks different, adjust the extraction logic there. Note orders " +
+    "don't include tickets - those come from a separate endpoint."
 );

@@ -3,11 +3,12 @@ import fetch from "node-fetch";
 const BASE_URL = "https://api.humanitix.com/v1";
 
 // Default status values (case-insensitive) treated as "not a real attendee,
-// don't sync". Only "complete" has been confirmed against a live account so
-// far - the others are best-guess based on common ticketing platform
-// conventions. Override via config.json's "excludeStatuses", and check
-// docs/options.json's "ticketStatuses" (from Refresh options) to see the
-// actual values your account uses.
+// don't sync". "cancelled" and "refunded" are confirmed against the live
+// account (along with complete/free/paid/partiallyRefunded, which are
+// deliberately NOT excluded); "canceled", "void" and "voided" are defensive
+// guesses never actually seen. Override via config.json's "excludeStatuses",
+// and check docs/options.json's "ticketStatuses" (from Refresh options) to see
+// the actual values your account uses.
 export const DEFAULT_EXCLUDED_STATUSES = ["cancelled", "canceled", "refunded", "void", "voided"];
 
 function headers(apiKey) {
@@ -75,10 +76,8 @@ export async function getAllEvents(apiKey, { pageSize = 100 } = {}) {
 
 /**
  * Fetch ALL orders for an event, paginating until exhausted.
- * NOTE: field names below (page/pageSize/total, orders array shape) are based
- * on Humanitix's documented conventions but haven't been verified against a
- * live account. Run `npm run discover` first — if pagination or the response
- * shape looks different, adjust this function accordingly.
+ * Orders do NOT embed their tickets - fetch those separately with
+ * getAllTickets() and link them back via ticket.orderId.
  */
 export async function getAllOrders(apiKey, eventId, { pageSize = 100 } = {}) {
   const all = [];
@@ -99,9 +98,9 @@ export async function getAllOrders(apiKey, eventId, { pageSize = 100 } = {}) {
 
 /**
  * Fetch ALL tickets for an event (individual attendees), paginating until
- * exhausted. Unconfirmed against a live account yet - if this 404s or
- * returns nothing, extractAttendees() falls back to treating each order's
- * buyer as a single attendee instead.
+ * exhausted. Confirmed working against the live account. If an order has no
+ * tickets, extractAttendees() falls back to treating the order's buyer as a
+ * single attendee.
  */
 export async function getAllTickets(apiKey, eventId, { pageSize = 100 } = {}) {
   const all = [];

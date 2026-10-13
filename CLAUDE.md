@@ -4,6 +4,8 @@ Syncs Humanitix event attendees — including per-ticket checkout question answe
 
 ## Architecture
 
+- **Repo**: `singegill/humanitix-mailchimp-sync` on GitHub — **private**, and under the `singegill` account (no hyphen), not `singe-gill`. If `git`/`gh` says "Repository not found", the wrong account is active in `gh` (`gh auth switch`).
+
 - **Execution**: GitHub Actions, scheduled cron (currently every 3 hours) + manual `workflow_dispatch` trigger
 - **Control panel**: a single static page (`docs/index.html`), hosted via GitHub Pages, that talks directly to the GitHub REST API from the browser using a user-supplied fine-grained PAT. No backend server.
 - **Config storage**:
@@ -68,7 +70,9 @@ Humanitix's public API docs are JS-rendered and didn't scrape reliably, so most 
 }
 ```
 
-Ticket types with no `emailRouting` entry fall back to: one contact per ticket, auto-detected email, no tag.
+Ticket types with no `emailRouting` entry fall back to: one contact per ticket, auto-detected email, no tag. `ticketType` matching is case-insensitive.
+
+The live `config.json` currently routes Camp No Fear: `Camper` → tag `CNF 2027 Camper` (with parent/carer secondary), `Team Member` → tag `CNF 2027 Team Member`. It has no `excludeStatuses` key, so the code default applies. Its `mergeFieldMap` maps FNAME/LNAME twice (from `firstName`/`lastName`, then from the "This persons first/last name" questions); later rules win, so the question answers take priority when present.
 
 ## Files
 
@@ -91,7 +95,7 @@ Ticket types with no `emailRouting` entry fall back to: one contact per ticket, 
 ## Key decisions & rationale
 
 - **Batch API for Mailchimp writes** (not per-contact loops) — Mailchimp's own recommended pattern for bulk operations, well under their 10-concurrent-connection limit.
-- **Dry-run mode is privacy-aware by default**: full per-attendee detail (emails, names, checkout answers like dietary/medical info) only prints when run locally, or with an explicit `--show-details` flag — not by default in GitHub Actions, since a public repo's Actions logs are publicly visible to anyone.
+- **Dry-run mode is privacy-aware by default**: full per-attendee detail (emails, names, checkout answers like dietary/medical info) only prints when run locally, or with an explicit `--show-details` flag — not by default in GitHub Actions, since a public repo's Actions logs are publicly visible to anyone. The repo is now private, but the guard is kept as a precaution (and in case it's ever made public again).
 - **Sync schedule**: started at every 10 minutes, reduced to hourly, settled on **every 3 hours** (`0 */3 * * *`). Not driven by API rate limits (Humanitix: 200 req/min; Mailchimp: 10 concurrent connections — neither is close to being hit at this event's scale) but by **GitHub Actions minutes**: a private repo's free tier is 2,000 min/month, and 10-minute polling (~4,320 runs/month) risked exceeding that, while 3-hourly (~240 runs/month) leaves comfortable headroom. The manual "Sync now" / "Dry run" buttons cover anything time-sensitive.
 - **Ticket-type fields in the UI are real `<select>` dropdowns** (small closed set, populated from `docs/accounts.json`/`options.json`); checkout-question/merge-field/tag fields stay as free-text with autocomplete (open-ended sets) but got a visible chevron added so the autocomplete affordance isn't invisible.
 - **Cancelled/refunded filtering** checks `order.status`, `order.financialStatus`, `ticket.status`, `ticket.financialStatus` case-insensitively against `config.excludeStatuses`. A whole-order match skips every ticket in it; a ticket-level match skips just that ticket.
