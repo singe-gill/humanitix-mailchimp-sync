@@ -112,7 +112,7 @@ Resolved since last write-up, kept here only as a pointer to where the evidence 
 ## Testing approach used throughout
 
 Given the API's undocumented shape, most fixes were verified two ways before shipping:
-1. **Live diagnostics** — temporary logging added to discovery scripts to dump real (PII-redacted) API responses into the GitHub Actions log, confirming actual field names/shapes.
+1. **Live diagnostics** — temporary logging added to discovery scripts to dump real (PII-redacted) API responses into the GitHub Actions log, confirming actual field names/shapes. **The repo is now public, so these logs are too** — prefer running diagnostics locally (`npm run discover`, or `node src/sync.js --dry-run`), and if anything must go in an Actions log, redact it fully and delete the run afterwards.
 2. **Isolated unit tests** — synthetic data built to match the confirmed real shape, run through the actual extraction/mapping functions with `console.assert`, to catch logic errors before they touched live Mailchimp data.
 
 This pattern is worth continuing for any further changes to the extraction/routing logic, given how much of Humanitix's API had to be inferred rather than documented.
