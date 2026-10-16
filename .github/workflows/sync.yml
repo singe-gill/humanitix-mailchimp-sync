@@ -2,11 +2,14 @@ name: Sync Humanitix attendees to Mailchimp
 
 on:
   schedule:
-    # Every 3 hours. Registrations don't come in fast enough to need tighter
-    # polling, and this keeps GitHub Actions minutes usage minimal (~240
-    # runs/month vs 4,320 at a 10-minute interval). Use "Sync now" in the
-    # control panel for anything time-sensitive, like right before a send.
-    - cron: "0 */3 * * *"
+    # Every 3 hours, at 7 past (GitHub delays/drops more scheduled runs at
+    # the top of the hour). Registrations don't come in fast enough to need
+    # tighter polling. Use "Sync now" in the control panel for anything
+    # time-sensitive, like right before a send.
+    # NOTE: scheduled runs belong to whoever last edited this cron line. If
+    # that account loses access (e.g. after a repo transfer), the schedule
+    # silently stops - fix by re-editing this line from a current account.
+    - cron: "7 */3 * * *"
   workflow_dispatch:
     inputs:
       full:
