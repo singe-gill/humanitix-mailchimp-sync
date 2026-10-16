@@ -228,7 +228,7 @@ async function main() {
         batchId: batch.id,
       });
       console.log(
-        `Batch finished: ${finished.completed_operations}/${finished.total_operations} ops, ${finished.errored_operations} error(s).`
+        `Batch finished: ${finished.finished_operations}/${finished.total_operations} ops, ${finished.errored_operations} error(s).`
       );
       if (finished.errored_operations > 0) {
         // The report behind response_body_url can contain attendee emails,
