@@ -857,7 +857,7 @@ async function refreshOptions() {
 async function loadRuns() {
   const el = $("runsList");
   try {
-    const res = await fetch(`${GH}/repos/${conn.owner}/${conn.repo}/actions/workflows/sync.yml/runs?per_page=8`, { headers: ghHeaders() });
+    const res = await fetch(`${GH}/repos/${conn.owner}/${conn.repo}/actions/workflows/sync-attendees.yml/runs?per_page=8`, { headers: ghHeaders() });
     if (!res.ok) throw new Error(`Failed to load runs (${res.status})`);
     const data = await res.json();
     if (!data.workflow_runs || data.workflow_runs.length === 0) {
@@ -888,7 +888,7 @@ async function runNow(dryRun) {
   try {
     const repoInfo = await (await fetch(`${GH}/repos/${conn.owner}/${conn.repo}`, { headers: ghHeaders() })).json();
     const branch = repoInfo.default_branch || "main";
-    const res = await fetch(`${GH}/repos/${conn.owner}/${conn.repo}/actions/workflows/sync.yml/dispatches`, {
+    const res = await fetch(`${GH}/repos/${conn.owner}/${conn.repo}/actions/workflows/sync-attendees.yml/dispatches`, {
       method: "POST",
       headers: { ...ghHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({

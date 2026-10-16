@@ -6,9 +6,9 @@ on:
     # the top of the hour). Registrations don't come in fast enough to need
     # tighter polling. Use "Sync now" in the control panel for anything
     # time-sensitive, like right before a send.
-    # NOTE: scheduled runs belong to whoever last edited this cron line. If
-    # that account loses access (e.g. after a repo transfer), the schedule
-    # silently stops - fix by re-editing this line from a current account.
+    # NOTE: after the 2026-10-13 repo transfer the schedule silently stopped
+    # firing (manual runs still worked). This file was renamed from sync.yml
+    # so GitHub would register it as a new workflow - see CLAUDE.md.
     - cron: "7 */3 * * *"
   workflow_dispatch:
     inputs:

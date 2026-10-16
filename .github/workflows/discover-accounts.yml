@@ -3,7 +3,7 @@ name: Refresh events & audiences
 # Triggered from the "Refresh events & audiences" button in the control panel
 # (docs/index.html). Runs server-side with the real API keys and writes
 # docs/accounts.json - the browser never sees the keys, only the resulting
-# list of event/audience names. Unlike sync.yml and discover-options.yml,
+# list of event/audience names. Unlike sync-attendees.yml and discover-options.yml,
 # this only needs the Secrets, not HUMANITIX_EVENT_IDS/MAILCHIMP_LIST_ID,
 # so it works even before those are set.
 on:

@@ -97,7 +97,7 @@ look right before automating.
 
 ## 5. Automate it
 
-The included `.github/workflows/sync.yml` runs the sync every 3 hours
+The included `.github/workflows/sync-attendees.yml` runs the sync every 3 hours
 (`0 */3 * * *` — chosen to stay well inside GitHub Actions' free minutes, not
 because of API limits) and also exposes a manual "Run workflow" button (with
 full-backfill and dry-run options) in the GitHub Actions tab.
@@ -206,5 +206,5 @@ legacy `tagRules` entry of type `questionAnswerEquals` (see `src/mapping.js`).
 | `docs/accounts.json` | Auto-generated; discovered Humanitix events / Mailchimp audiences for the control panel's pickers |
 | `src/discover-options.js` | Scans orders + Mailchimp to produce `docs/options.json` |
 | `src/discover-accounts.js` | Lists events + audiences to produce `docs/accounts.json` |
-| `.github/workflows/sync.yml` | Scheduled (3-hourly) + manual sync |
+| `.github/workflows/sync-attendees.yml` | Scheduled (3-hourly) + manual sync |
 | `.github/workflows/discover-options.yml`, `discover-accounts.yml` | Manual-only jobs behind the control panel's Refresh buttons |
